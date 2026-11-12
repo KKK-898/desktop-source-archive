@@ -1,0 +1,78 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="2560" height="1440" viewBox="0 0 2560 1440">
+  <defs>
+    <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#4b9de0"/>
+      <stop offset="0.42" stop-color="#b9e4ff"/>
+      <stop offset="0.72" stop-color="#edf8ff"/>
+      <stop offset="1" stop-color="#b7dbf2"/>
+    </linearGradient>
+    <linearGradient id="horizon" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#dff4ff" stop-opacity="0.92"/>
+      <stop offset="0.48" stop-color="#ffffff" stop-opacity="0.68"/>
+      <stop offset="1" stop-color="#91c9ef" stop-opacity="0.82"/>
+    </linearGradient>
+    <linearGradient id="water" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#d9f1ff"/>
+      <stop offset="1" stop-color="#77b8e4"/>
+    </linearGradient>
+    <radialGradient id="sun" cx="50%" cy="50%" r="50%">
+      <stop offset="0" stop-color="#fff" stop-opacity="0.98"/>
+      <stop offset="0.34" stop-color="#fff7bd" stop-opacity="0.72"/>
+      <stop offset="1" stop-color="#fff" stop-opacity="0"/>
+    </radialGradient>
+    <filter id="blur18">
+      <feGaussianBlur stdDeviation="18"/>
+    </filter>
+    <filter id="blur36">
+      <feGaussianBlur stdDeviation="36"/>
+    </filter>
+    <pattern id="sparkles" width="150" height="130" patternUnits="userSpaceOnUse">
+      <circle cx="18" cy="34" r="2.2" fill="#fff" opacity="0.62"/>
+      <circle cx="98" cy="84" r="1.5" fill="#fff" opacity="0.48"/>
+      <path d="M58 13v12M52 19h12" stroke="#fff" stroke-width="1.2" opacity="0.42"/>
+    </pattern>
+  </defs>
+
+  <rect width="2560" height="1440" fill="url(#sky)"/>
+  <circle cx="2020" cy="250" r="420" fill="url(#sun)"/>
+  <rect width="2560" height="900" fill="url(#sparkles)" opacity="0.48"/>
+
+  <g fill="#fff" opacity="0.78" filter="url(#blur18)">
+    <ellipse cx="280" cy="310" rx="260" ry="72"/>
+    <ellipse cx="530" cy="300" rx="190" ry="58"/>
+    <ellipse cx="1180" cy="390" rx="300" ry="78"/>
+    <ellipse cx="1510" cy="355" rx="210" ry="62"/>
+  </g>
+
+  <g fill="#f8fcff" opacity="0.92">
+    <path d="M0 470c210-64 342-29 506 26 148 50 296 58 482 3 173-51 341-73 542-15 207 60 396 49 579-20 154-58 300-68 451-34v338H0z"/>
+    <path d="M0 660c255-70 470-50 686 22 218 73 414 58 617-1 232-67 431-67 665 8 196 62 383 69 592 16v260H0z" fill="url(#horizon)" opacity="0.84"/>
+  </g>
+
+  <path d="M0 872c246-86 483-106 704-60 233 49 407 33 615-49 220-87 429-98 659-28 174 53 362 78 582 38v667H0z" fill="#78b8df" opacity="0.55"/>
+  <path d="M0 940c266-104 516-92 760-20 217 64 413 54 626-33 229-94 464-86 694 2 148 57 307 85 480 61v490H0z" fill="url(#water)"/>
+
+  <g fill="none" stroke="#fff" stroke-linecap="round">
+    <path d="M140 1050c428-92 827-84 1211 3 339 77 687 70 1062-20" stroke-width="9" opacity="0.42"/>
+    <path d="M80 1160c474-66 901-45 1288 38 344 74 700 68 1090-14" stroke-width="5" opacity="0.38"/>
+    <path d="M250 1270c351-45 700-34 1038 30 373 71 737 65 1090-11" stroke-width="3" opacity="0.28"/>
+  </g>
+
+  <g fill="#fff" opacity="0.28" filter="url(#blur36)">
+    <ellipse cx="1740" cy="980" rx="410" ry="85"/>
+    <ellipse cx="720" cy="1080" rx="360" ry="72"/>
+  </g>
+
+  <g fill="none" stroke="#fff" stroke-width="5" opacity="0.38">
+    <circle cx="2050" cy="520" r="82"/>
+    <circle cx="2240" cy="690" r="44"/>
+    <circle cx="1840" cy="705" r="29"/>
+    <circle cx="390" cy="650" r="66"/>
+    <circle cx="560" cy="770" r="31"/>
+  </g>
+
+  <g transform="translate(1910 860)" opacity="0.32">
+    <path d="M0 206c70-88 142-139 219-153 78-14 156 9 235 69v176H0z" fill="#2f7dcc"/>
+    <path d="M54 233c76-67 149-98 219-93 72 5 143 43 214 114v44H54z" fill="#1d6bb1"/>
+  </g>
+</svg>

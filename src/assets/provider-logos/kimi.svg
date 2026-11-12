@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none">
+  <title>Kimi</title>
+  <path d="M5.75 3.5v17" stroke="#4F7CFF" stroke-width="3.5" stroke-linecap="round"/>
+  <path d="m18.25 5-10 7 10 7" stroke="#4F7CFF" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/>
+  <circle cx="19.1" cy="4.1" r="2.35" fill="#8FB2FF"/>
+</svg>

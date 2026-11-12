@@ -1,0 +1,81 @@
+name: Mobile Components
+run-name: Independent mobile components - ${{ github.run_number }}
+
+on:
+  push:
+    branches: ['codex/mobile-components-*']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: mobile-components-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  component:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runtime: windows-x86_64
+            os: windows-latest
+            python-architecture: x64
+          - runtime: macos-aarch64
+            os: macos-15
+            python-architecture: arm64
+          - runtime: macos-x86_64
+            os: macos-15-intel
+            python-architecture: x64
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 40
+    env:
+      MOBILE_RUNTIME: ${{ matrix.runtime }}
+      MACOSX_DEPLOYMENT_TARGET: '11.0'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.14'
+          architecture: ${{ matrix.python-architecture }}
+          cache: pip
+          cache-dependency-path: mobile-bridge/requirements*.txt
+      - name: Verify native Python architecture
+        shell: python
+        run: |
+          import os, platform, sys
+          system = {'win32': 'windows', 'darwin': 'macos'}[sys.platform]
+          arch = {'amd64': 'x86_64', 'x86_64': 'x86_64', 'arm64': 'aarch64'}[platform.machine().lower()]
+          assert system + '-' + arch == os.environ['MOBILE_RUNTIME']
+      - name: Build compatible static crypto for Intel Mac
+        if: matrix.runtime == 'macos-x86_64'
+        run: python scripts/prepare-macos-crypto.py
+      - run: python -m pip install -r mobile-bridge/requirements-desktop.txt
+      - name: Test native packaging rules
+        run: python -m unittest scripts/build_mobile_bridge_test.py -v
+      - name: Test component archive integrity rules
+        run: python -m unittest scripts/mobile_component_release_test.py -v
+      - name: Test isolated relay and controller
+        working-directory: mobile-bridge
+        run: python -m unittest discover -s tests -v
+      - name: Build native phone component
+        run: python scripts/build-mobile-bridge.py
+      - name: Verify frozen component without Codex or an account
+        shell: python
+        run: |
+          import os, subprocess, sys
+          from pathlib import Path
+          runtime = os.environ['MOBILE_RUNTIME']
+          name = 'gaoge-mobile-gateway.exe' if runtime.startswith('windows-') else 'gaoge-mobile-gateway'
+          executable = Path('resources/mobile-bridge') / runtime / name
+          subprocess.run([sys.executable, 'scripts/test-mobile-runtime.py', str(executable.resolve())], check=True, timeout=90)
+      - name: Package independent component with permissions and links
+        run: python scripts/package-mobile-component.py --platform ${{ matrix.runtime }}
+      - uses: actions/upload-artifact@v4
+        with:
+          name: mobile-component-${{ matrix.runtime }}-${{ github.run_id }}
+          path: release/mobile-component-artifacts/*
+          compression-level: 0
+          retention-days: 14
+          if-no-files-found: error

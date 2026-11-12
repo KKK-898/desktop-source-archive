@@ -1,0 +1,34 @@
+{
+  "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
+  "bundle": {
+    "targets": ["app", "dmg"],
+    "resources": [
+      "../LICENSE",
+      "../NOTICE.md",
+      "../THIRD_PARTY_NOTICES.md",
+      "src/third_party/codex-plus-plus/LICENSE",
+      "src/third_party/codex-plus-plus/NOTICE.md",
+      "../resources/codex-locales/zh-CN.pak",
+      "../scripts/codex-plugin-patch.cjs",
+      "icons/icon.ico",
+      "../node_modules/@electron/asar/**/*",
+      "../node_modules/@electron/fuses/**/*",
+      "../node_modules/brace-expansion/**/*",
+      "../node_modules/glob/**/*",
+      "../node_modules/lru-cache/**/*",
+      "../node_modules/minimatch/**/*",
+      "../node_modules/minipass/**/*",
+      "../node_modules/path-scurry/**/*"
+    ],
+    "macOS": {
+      "minimumSystemVersion": "11.0"
+    }
+  },
+  "plugins": {
+    "updater": {
+      "endpoints": [
+        "https://example.invalid/gaogeaii/updates/mac/latest.json"
+      ]
+    }
+  }
+}

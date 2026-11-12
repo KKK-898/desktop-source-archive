@@ -1,0 +1,26 @@
+[Unit]
+Description=Gaoge Codex mobile relay
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=gaoge-mobile-relay
+Group=gaoge-mobile-relay
+WorkingDirectory=/opt/gaoge-mobile-relay/current
+Environment=PYTHONUNBUFFERED=1
+Environment=GAOGE_ACCOUNT_VERIFY_URL=https://api.gaogeaii.com/api/v1/auth/me
+ExecStart=/opt/gaoge-mobile-relay/venv/bin/python -m relay --data-dir /var/lib/gaoge-mobile-relay serve --origin https://api.gaogeaii.com/mobile --host 127.0.0.1 --port 18790
+Restart=on-failure
+RestartSec=3
+TimeoutStopSec=20
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/gaoge-mobile-relay
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+
+[Install]
+WantedBy=multi-user.target

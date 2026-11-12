@@ -1,0 +1,84 @@
+{
+  "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
+  "productName": "Gaoge Free",
+  "version": "1.7.1",
+  "identifier": "cloud.gaogeai.free",
+  "build": {
+    "frontendDist": "../dist",
+    "devUrl": "http://127.0.0.1:5173",
+    "beforeDevCommand": "npm run dev",
+    "beforeBuildCommand": "npm run build"
+  },
+  "app": {
+    "windows": [
+      {
+        "title": "Gaoge Free",
+        "width": 1250,
+        "height": 800,
+        "minWidth": 1250,
+        "minHeight": 700,
+        "resizable": true,
+        "fullscreen": false,
+        "center": true,
+        "theme": "Dark",
+        "backgroundColor": "#0f131a"
+      }
+    ],
+    "security": {
+      "csp": null,
+      "assetProtocol": {
+        "enable": true,
+        "scope": [
+          "$DATA/Gaoge Free/codex-themes/**"
+        ]
+      }
+    }
+  },
+  "bundle": {
+    "active": true,
+    "createUpdaterArtifacts": true,
+    "targets": "all",
+    "resources": [
+      "../LICENSE",
+      "../NOTICE.md",
+      "../THIRD_PARTY_NOTICES.md",
+      "../resources/codex-locales/zh-CN.pak",
+      "../scripts/codex-plugin-patch.cjs",
+      "src/third_party/codex-plus-plus/LICENSE",
+      "src/third_party/codex-plus-plus/NOTICE.md",
+      "icons/icon.ico",
+      "../node_modules/@electron/asar/**/*",
+      "../node_modules/@electron/fuses/**/*",
+      "../node_modules/brace-expansion/**/*",
+      "../node_modules/glob/**/*",
+      "../node_modules/lru-cache/**/*",
+      "../node_modules/minimatch/**/*",
+      "../node_modules/minipass/**/*",
+      "../node_modules/path-scurry/**/*"
+    ],
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ],
+    "windows": {
+      "nsis": {
+        "installMode": "currentUser",
+        "displayLanguageSelector": false
+      }
+    }
+  },
+  "plugins": {
+    "updater": {
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDUxRkI3ODM3RjA5QUIxM0UKUldRK3NacndOM2o3VWJEblJXUEZ5TDBEZjc5bERiT2JrNFloeDZ6a3RoWFgyVStxTVRUWU9EeUYK",
+      "endpoints": [
+        "https://example.invalid/gaogeaii/updates/win/latest.json"
+      ],
+      "windows": {
+        "installMode": "passive"
+      }
+    }
+  }
+}

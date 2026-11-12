@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none">
+  <title>GLM / Z.ai</title>
+  <defs>
+    <linearGradient id="glm-gradient" x1="3" y1="3" x2="21" y2="21" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#5B7CFF"/>
+      <stop offset="0.52" stop-color="#7357E8"/>
+      <stop offset="1" stop-color="#3CC8D4"/>
+    </linearGradient>
+  </defs>
+  <rect x="1.5" y="1.5" width="21" height="21" rx="6.25" fill="url(#glm-gradient)"/>
+  <path d="M6.5 7.25h11L7.2 16.75h10.3" stroke="#FFFFFF" stroke-width="2.35" stroke-linecap="round" stroke-linejoin="round"/>
+  <circle cx="17.55" cy="6.45" r="1.35" fill="#BDF7FF"/>
+</svg>

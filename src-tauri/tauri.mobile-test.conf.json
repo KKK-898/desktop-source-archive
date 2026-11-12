@@ -1,0 +1,25 @@
+{
+  "app": {
+    "windows": [
+      {
+        "title": "Gaoge Free - 手机连接测试版",
+        "width": 1250,
+        "height": 800,
+        "minWidth": 1250,
+        "minHeight": 700,
+        "resizable": true,
+        "fullscreen": false,
+        "center": true,
+        "theme": "Dark",
+        "backgroundColor": "#0f131a"
+      }
+    ]
+  },
+  "bundle": {
+    "createUpdaterArtifacts": false,
+    "macOS": {
+      "minimumSystemVersion": "11.0",
+      "signingIdentity": "-"
+    }
+  }
+}

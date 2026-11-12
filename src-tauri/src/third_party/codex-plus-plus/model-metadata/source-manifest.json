@@ -1,0 +1,127 @@
+{
+  "repository": "https://github.com/BigPizzaV3/CodexPlusPlus",
+  "revision": "38033bf98325a32bbb80842441e2e0e2b3c9d7bd",
+  "commitDate": "2026-11-10T19:29:03Z",
+  "importDate": "2026-11-11",
+  "license": "AGPL-3.0",
+  "licenseFile": "LICENSE",
+  "modified": false,
+  "modelCount": 69,
+  "files": [
+    {
+      "file": "astra-model-metadata-compat.json",
+      "upstreamPath": "assets/astra-model-metadata-compat.json",
+      "sha256": "80e16b457cef0ae56b893ec010912f6b6a8e7e5f7a6f7c4a4e8adaa5eda66ce3",
+      "modelCount": 1
+    },
+    {
+      "file": "deepseek-model-metadata.json",
+      "upstreamPath": "assets/deepseek-model-metadata.json",
+      "sha256": "689e96df26ea53a01ec0a74d8ebfcf5267675202fb81542e1ff5f7e7a415ff3d",
+      "modelCount": 8
+    },
+    {
+      "file": "doubao-model-metadata.json",
+      "upstreamPath": "assets/doubao-model-metadata.json",
+      "sha256": "12b65e476e07b782e21b745d5a60146eeb9b6ca7daa08614c832d8724ad541d0",
+      "modelCount": 5
+    },
+    {
+      "file": "gemini-model-metadata.json",
+      "upstreamPath": "assets/gemini-model-metadata.json",
+      "sha256": "1124ba794565d3fce5760ed87ddb5d4e17211f79502b1f1a09bab829a4db040f",
+      "modelCount": 4
+    },
+    {
+      "file": "glm-model-metadata.json",
+      "upstreamPath": "assets/glm-model-metadata.json",
+      "sha256": "1e289cdd3d9fa457fdadbf059386312dff5d9883bb0f6f98e4df42871e8104ec",
+      "modelCount": 8
+    },
+    {
+      "file": "gpt56-model-metadata-compat.json",
+      "upstreamPath": "assets/gpt56-model-metadata-compat.json",
+      "sha256": "45e71095075348a03c64e87f6a962595d5cd8027e0538395578b540404437ad4",
+      "modelCount": 3
+    },
+    {
+      "file": "gpt6-sol-luna-model-metadata-compat.json",
+      "upstreamPath": "assets/gpt6-sol-luna-model-metadata-compat.json",
+      "sha256": "8630777b66eb8a61fd5aa2f79d7c879be5bb07a99ae77bc2b774d845f9a54c61",
+      "modelCount": 2
+    },
+    {
+      "file": "gpt61-sol-model-metadata-compat.json",
+      "upstreamPath": "assets/gpt61-sol-model-metadata-compat.json",
+      "sha256": "ec0dc2328b6814bc5cc54748322aea50ee4922adc690fa5f59c92e73cb298ac3",
+      "modelCount": 1
+    },
+    {
+      "file": "gptoss-model-metadata.json",
+      "upstreamPath": "assets/gptoss-model-metadata.json",
+      "sha256": "d919241d3606e52e3b17619b20fff4966fa6948049b3a44959421778a14b89cf",
+      "modelCount": 1
+    },
+    {
+      "file": "grok-model-metadata.json",
+      "upstreamPath": "assets/grok-model-metadata.json",
+      "sha256": "e5bebac4cc0578813c346d107b8397c8ffae5a7184c820f2027faf54b7c15472",
+      "modelCount": 3
+    },
+    {
+      "file": "kimi-model-metadata.json",
+      "upstreamPath": "assets/kimi-model-metadata.json",
+      "sha256": "a37a29c4e3e3ffc43071eafa2f640da6149efc3389335d7e950f508746cd7242",
+      "modelCount": 9
+    },
+    {
+      "file": "mimo-model-metadata.json",
+      "upstreamPath": "assets/mimo-model-metadata.json",
+      "sha256": "219df5efb03f1d9fdda7774097f141e930ad788e893d2e6ef4148913eb14e0ec",
+      "modelCount": 4
+    },
+    {
+      "file": "minimax-model-metadata.json",
+      "upstreamPath": "assets/minimax-model-metadata.json",
+      "sha256": "440c34645bd731f7fb30131b5638d16f397f942d32fc119002fa65d75e53da27",
+      "modelCount": 4
+    },
+    {
+      "file": "mistral-model-metadata.json",
+      "upstreamPath": "assets/mistral-model-metadata.json",
+      "sha256": "89b555b5e2fbb62c593127cc63c865b08ffcd1aaf9f3bcd5305102b1986bfdf5",
+      "modelCount": 1
+    },
+    {
+      "file": "muse-model-metadata.json",
+      "upstreamPath": "assets/muse-model-metadata.json",
+      "sha256": "0db5f6adb7749f4fd2c40065189eb9969af01493bfcfb7f2b423c5c0ab198669",
+      "modelCount": 2
+    },
+    {
+      "file": "nvidia-model-metadata.json",
+      "upstreamPath": "assets/nvidia-model-metadata.json",
+      "sha256": "9fcca859e9ac6241a6cf5514bbdf6e48fa6d058f520f51fc9ebc73b20dd912dc",
+      "modelCount": 1
+    },
+    {
+      "file": "qwen-model-metadata.json",
+      "upstreamPath": "assets/qwen-model-metadata.json",
+      "sha256": "399713be7a570f3b0de0adbf961291c3b88effdd9a30b5dc2d916e053a1058a3",
+      "modelCount": 9
+    },
+    {
+      "file": "stepfun-model-metadata.json",
+      "upstreamPath": "assets/stepfun-model-metadata.json",
+      "sha256": "a2209ea35e5a49ddde685833a0a0925773e50ace291f398588cfcb30201a84c4",
+      "modelCount": 2
+    },
+    {
+      "file": "thinkingmachines-model-metadata.json",
+      "upstreamPath": "assets/thinkingmachines-model-metadata.json",
+      "sha256": "dce768557c6859960118a8963c4827c9045b8dfad7c8f6ac1a752f5b746e88f7",
+      "modelCount": 1
+    }
+  ],
+  "licenseSha256": "8486a10c4393cee1c25392769ddd3b2d6c242d6ec7928e1414efff7dfb2f07ef"
+}

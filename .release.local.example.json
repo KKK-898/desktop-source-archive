@@ -1,0 +1,31 @@
+{
+  "bootstrapConfigUrls": [
+    "https://your-primary-oss.example.com/desktop-server-directory.json",
+    "https://your-backup-oss.example.com/desktop-server-directory.json"
+  ],
+  "buildRepo": "OWNER/gaoge-free-public-build",
+  "buildBranch": "master",
+  "sourceBranch": "main",
+  "sshHosts": {
+    "primary": {
+      "host": "203.0.113.10",
+      "port": 22,
+      "user": "root",
+      "identityFile": "%USERPROFILE%/.ssh/id_ed25519"
+    }
+  },
+  "updateMirrors": [
+    {
+      "id": "primary",
+      "sshHost": "primary",
+      "publicBaseUrl": "https://api.example.com/gaogeaii/updates",
+      "remoteRoot": "/var/www/gaogeaii/update-sites/primary"
+    },
+    {
+      "id": "legacy",
+      "sshHost": "primary",
+      "publicBaseUrl": "https://legacy.example.com/gaogeaii/updates",
+      "remoteRoot": "/var/www/gaogeaii/updates"
+    }
+  ]
+}

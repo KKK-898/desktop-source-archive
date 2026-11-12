@@ -1,0 +1,22 @@
+{
+  "revision": "38033bf98325a32bbb80842441e2e0e2b3c9d7bd",
+  "license": "AGPL-3.0",
+  "derivedFile": "provider-presets.json",
+  "transformation": "Static literal fields only: PRESETS and GATEWAY_EXTRA_PRESETS. key is renamed to id; section is renamed to category; missing model/modelList are represented as empty string/array. Models are not expanded from capability metadata. Presets declare endpoint defaults, not live model availability. Sponsor expiry/display promotions are not imported.",
+  "sources": [
+    {
+      "path": "apps/codex-plus-manager/src/presets.ts",
+      "startLine": 34,
+      "endLine": 280,
+      "sha256": "3cdcc834ddb7d0a3e96f96203b269650ac2dffb7240df7135b230c13473f2878"
+    },
+    {
+      "path": "apps/codex-plus-manager/src/gateway-model.ts",
+      "startLine": 1120,
+      "endLine": 1183,
+      "sha256": "90d8817b9559c38247b281fc4b8d2cd3ce9d9d47ddbe5f8bdb0de6d6703ba150"
+    }
+  ],
+  "sha256": "8a2f6d04d345e791478e909c420d3bf9f10520afced0d9a6352514473e4b74b7",
+  "count": 29
+}

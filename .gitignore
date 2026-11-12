@@ -1,0 +1,43 @@
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+node_modules
+dist
+dist-ssr
+release
+*.local
+.release.local.json
+src/assets/codex-theme-preview-sheet.jpg
+__pycache__/
+*.pyc
+mobile-bridge/.venv/
+mobile-bridge/.tmp/
+mobile-bridge/.local/
+resources/mobile-bridge/windows-*/
+resources/mobile-bridge/macos-*/
+resources/mobile-bridge/linux-*/
+
+# Local/offline Codex installer payloads are distributed outside Git.
+resources/codex-offline/
+
+# Editor directories and files
+.vscode/*
+!.vscode/extensions.json
+.idea
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+src-tauri/tauri-update.key
+src-tauri/tauri-update.key.pub
+
+# Local validation screenshots and evidence, never part of release source.
+.codex-validation/

@@ -1,0 +1,70 @@
+name: Mac Mobile Connection Test
+run-name: Mac mobile connection test - ${{ github.run_number }}
+
+on:
+  push:
+    branches: ['codex/mac-mobile-test-*']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: mac-mobile-test-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  mac-package:
+    runs-on: macos-15
+    timeout-minutes: 75
+    env:
+      MACOSX_DEPLOYMENT_TARGET: '11.0'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.14'
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-apple-darwin,x86_64-apple-darwin
+      - run: npm ci
+      - run: node scripts/verify-mobile-runtime.mjs mac
+      - name: Verify the native supervisor on macOS
+        run: cargo test --locked --manifest-path src-tauri/Cargo.toml --lib mobile_ -- --test-threads=1
+      - name: Verify public component download and offline reuse
+        run: cargo test --locked --manifest-path src-tauri/Cargo.toml --lib mobile_component::tests::official_download_isolated_and_offline_reuse -- --ignored --exact --nocapture --test-threads=1
+      - name: Build universal Mac test application and installer
+        env:
+          VITE_GAOGE_BOOTSTRAP_CONFIG_URLS: 'https://gaoge-desktop-config.oss-cn-shanghai.aliyuncs.com/desktop-server-directory.json'
+        run: npx tauri build --target universal-apple-darwin --bundles app,dmg --ci --config src-tauri/tauri.mobile-test.conf.json
+      - name: Verify lightweight application, signature and installer
+        run: python scripts/verify-mac-mobile-test.py
+      - uses: actions/upload-artifact@v4
+        with:
+          name: gaoge-free-mac-mobile-test-${{ github.run_id }}
+          path: release/mac-mobile-test/
+          compression-level: 0
+          retention-days: 14
+          if-no-files-found: error
+
+  intel-component-install:
+    runs-on: macos-15-intel
+    timeout-minutes: 35
+    env:
+      MACOSX_DEPLOYMENT_TARGET: '11.0'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - uses: dtolnay/rust-toolchain@stable
+      - run: npm ci
+      - name: Verify native Intel component extraction and supervisor
+        run: cargo test --locked --manifest-path src-tauri/Cargo.toml --lib mobile_ -- --test-threads=1
+      - name: Verify public Intel download and offline reuse
+        run: cargo test --locked --manifest-path src-tauri/Cargo.toml --lib mobile_component::tests::official_download_isolated_and_offline_reuse -- --ignored --exact --nocapture --test-threads=1

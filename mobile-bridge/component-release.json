@@ -1,0 +1,7 @@
+{
+  "schemaVersion": 1,
+  "component": "mobile-connection",
+  "version": "1.0.0",
+  "protocolVersion": 1,
+  "minAppVersion": "1.6.6"
+}

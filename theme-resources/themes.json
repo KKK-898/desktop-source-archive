@@ -1,0 +1,419 @@
+{
+  "schemaVersion": 1,
+  "minimumClientVersion": "1.4.7",
+  "themes": [
+    {
+      "id": "aurora-valley",
+      "name": "极光之境",
+      "style": "沉浸深色",
+      "version": "1.0.1",
+      "author": "Gaoge Studio",
+      "description": "深色山谷与青紫极光，适合长时间专注编码。",
+      "appearance": "dark",
+      "sourceLabel": "Gaoge 原创",
+      "sourceFile": "gaoge-preview-sheet.jpg",
+      "runtime": "wallpaper",
+      "image": {
+        "mode": "extract",
+        "left": 0,
+        "top": 0,
+        "width": 836,
+        "height": 470
+      },
+      "background": {
+        "positionX": 50,
+        "positionY": 50,
+        "overlayOpacity": 0.34
+      },
+      "colors": {
+        "accent": "#22D3EE",
+        "secondary": "#A855F7",
+        "surface": "#0F172A",
+        "text": "#F8FAFC",
+        "muted": "#A5B4C7",
+        "border": "#334155"
+      },
+      "effects": {
+        "panelOpacity": 0.84,
+        "panelBlur": 12,
+        "radius": 8
+      },
+      "source": {
+        "kind": "original",
+        "repository": "",
+        "commit": "",
+        "originalPath": "src/assets/codex-theme-preview-sheet.jpg",
+        "sha256": "2835bb2ccf5344c07b5088dae33eb7ca90a5392a53d51450c5a822826d94a3ae"
+      }
+    },
+    {
+      "id": "ink-mountains",
+      "name": "云岫水墨",
+      "style": "东方留白",
+      "version": "1.0.1",
+      "author": "Gaoge Studio",
+      "description": "水墨群山搭配克制青色点缀，界面清爽安静。",
+      "appearance": "light",
+      "sourceLabel": "Gaoge 原创",
+      "sourceFile": "gaoge-preview-sheet.jpg",
+      "runtime": "wallpaper",
+      "image": {
+        "mode": "extract",
+        "left": 836,
+        "top": 0,
+        "width": 836,
+        "height": 470
+      },
+      "background": {
+        "positionX": 50,
+        "positionY": 50,
+        "overlayOpacity": 0.12
+      },
+      "colors": {
+        "accent": "#0891B2",
+        "secondary": "#64748B",
+        "surface": "#F8FAFC",
+        "text": "#172033",
+        "muted": "#64748B",
+        "border": "#CBD5E1"
+      },
+      "effects": {
+        "panelOpacity": 0.9,
+        "panelBlur": 8,
+        "radius": 8
+      },
+      "source": {
+        "kind": "original",
+        "repository": "",
+        "commit": "",
+        "originalPath": "src/assets/codex-theme-preview-sheet.jpg",
+        "sha256": "2835bb2ccf5344c07b5088dae33eb7ca90a5392a53d51450c5a822826d94a3ae"
+      }
+    },
+    {
+      "id": "neon-harbor",
+      "name": "霓虹海湾",
+      "style": "复古未来",
+      "version": "1.0.1",
+      "author": "Gaoge Studio",
+      "description": "珊瑚落日与青色霓虹，保留清晰文字对比度。",
+      "appearance": "dark",
+      "sourceLabel": "Gaoge 原创",
+      "sourceFile": "gaoge-preview-sheet.jpg",
+      "runtime": "wallpaper",
+      "image": {
+        "mode": "extract",
+        "left": 0,
+        "top": 470,
+        "width": 836,
+        "height": 471
+      },
+      "background": {
+        "positionX": 50,
+        "positionY": 50,
+        "overlayOpacity": 0.31
+      },
+      "colors": {
+        "accent": "#22D3EE",
+        "secondary": "#FB7185",
+        "surface": "#111827",
+        "text": "#F8FAFC",
+        "muted": "#CBD5E1",
+        "border": "#334155"
+      },
+      "effects": {
+        "panelOpacity": 0.84,
+        "panelBlur": 12,
+        "radius": 8
+      },
+      "source": {
+        "kind": "original",
+        "repository": "",
+        "commit": "",
+        "originalPath": "src/assets/codex-theme-preview-sheet.jpg",
+        "sha256": "2835bb2ccf5344c07b5088dae33eb7ca90a5392a53d51450c5a822826d94a3ae"
+      }
+    },
+    {
+      "id": "qq-retro",
+      "name": "QQ 复古",
+      "style": "经典复古",
+      "version": "1.3.0",
+      "author": "Janice zhang / Gaoge",
+      "description": "复用 Codex-QQ-2007 的蓝白三栏结构，并适配我们的启用、插件、会话和跨平台注入流程。",
+      "appearance": "light",
+      "sourceLabel": "Codex-QQ-2007 · MIT 兼容适配",
+      "sourceFile": "qq-2007-deep.svg",
+      "runtime": "qq-retro",
+      "image": {
+        "mode": "contain",
+        "background": "#EAF6FF"
+      },
+      "background": {
+        "positionX": 58,
+        "positionY": 48,
+        "overlayOpacity": 0.04
+      },
+      "colors": {
+        "accent": "#2F7DCC",
+        "secondary": "#5BA7EC",
+        "surface": "#FFFFFF",
+        "text": "#17395F",
+        "muted": "#587795",
+        "border": "#B9D4EC"
+      },
+      "effects": {
+        "panelOpacity": 0.9,
+        "panelBlur": 6,
+        "radius": 8
+      },
+      "source": {
+        "kind": "community",
+        "repository": "https://github.com/zhangjanice66/Codex-QQ-2007",
+        "commit": "ef88c712c5e919e12bff5c714fe1517e9d3a03a4",
+        "originalPath": "macos/assets/dream-skin.css + macos/assets/renderer-inject.js",
+        "sha256": "08a94088f743c5567068af8d6419349e9e5200dc95769562d444e818e7bec9ab"
+      }
+    },
+    {
+      "id": "deepspace-star",
+      "name": "恋与深空 · 星辰",
+      "style": "星海暗色",
+      "version": "1.0.1",
+      "author": "HeiGeAi",
+      "description": "深紫星海与柔和粉色点缀，营造安静沉浸的深色工作区。",
+      "appearance": "dark",
+      "sourceLabel": "社区素材 · HeiGeAi",
+      "sourceFile": "deepspace-star.webp",
+      "runtime": "wallpaper",
+      "image": {
+        "mode": "copy"
+      },
+      "background": {
+        "positionX": 50,
+        "positionY": 8,
+        "overlayOpacity": 0.32
+      },
+      "colors": {
+        "accent": "#9D8BFF",
+        "secondary": "#F097C8",
+        "surface": "#201A40",
+        "text": "#E8E2FF",
+        "muted": "#BEB4D8",
+        "border": "#4A416C"
+      },
+      "effects": {
+        "panelOpacity": 0.84,
+        "panelBlur": 12,
+        "radius": 8
+      },
+      "source": {
+        "kind": "community",
+        "repository": "https://github.com/HeiGeAi/heige-codex-skin-studio",
+        "commit": "7712c1f4c34f7802e00d72900311d15242480995",
+        "originalPath": "themes/deepspace-star/hero.webp",
+        "sha256": "f54f01c3190e0a40984de0d16913681870f2f457fd3f8a0a4c998a89a2928fc0"
+      }
+    },
+    {
+      "id": "deepspace-dawn",
+      "name": "恋与深空 · 晨曦",
+      "style": "柔光浅色",
+      "version": "1.0.1",
+      "author": "HeiGeAi",
+      "description": "轻柔晨光、浅紫和粉色点缀，适合偏好明亮界面的用户。",
+      "appearance": "light",
+      "sourceLabel": "社区素材 · HeiGeAi",
+      "sourceFile": "deepspace-dawn.webp",
+      "runtime": "wallpaper",
+      "image": {
+        "mode": "copy"
+      },
+      "background": {
+        "positionX": 50,
+        "positionY": 8,
+        "overlayOpacity": 0.12
+      },
+      "colors": {
+        "accent": "#8F7FE8",
+        "secondary": "#F097C8",
+        "surface": "#F6F2FB",
+        "text": "#4A4668",
+        "muted": "#746E91",
+        "border": "#D8D1EA"
+      },
+      "effects": {
+        "panelOpacity": 0.9,
+        "panelBlur": 8,
+        "radius": 8
+      },
+      "source": {
+        "kind": "community",
+        "repository": "https://github.com/HeiGeAi/heige-codex-skin-studio",
+        "commit": "7712c1f4c34f7802e00d72900311d15242480995",
+        "originalPath": "themes/deepspace-dawn/hero.webp",
+        "sha256": "8d0b6d47bcbc6d39ecc91a897742b211fa58be8b0b9f8334c612dbeb8026089e"
+      }
+    },
+    {
+      "id": "dragonball-super-saiyan",
+      "name": "龙珠 · 超级赛亚人",
+      "style": "热血明亮",
+      "version": "1.0.1",
+      "author": "HeiGeAi",
+      "description": "金色能量与天蓝高光，呈现明亮有冲击力的工作氛围。",
+      "appearance": "light",
+      "sourceLabel": "社区素材 · HeiGeAi",
+      "sourceFile": "dragonball-super-saiyan.webp",
+      "runtime": "wallpaper",
+      "image": {
+        "mode": "copy"
+      },
+      "background": {
+        "positionX": 67,
+        "positionY": 3,
+        "overlayOpacity": 0.1
+      },
+      "colors": {
+        "accent": "#F5C451",
+        "secondary": "#52C7F2",
+        "surface": "#FFF8E8",
+        "text": "#282033",
+        "muted": "#685F72",
+        "border": "#E8D9AE"
+      },
+      "effects": {
+        "panelOpacity": 0.9,
+        "panelBlur": 8,
+        "radius": 8
+      },
+      "source": {
+        "kind": "community",
+        "repository": "https://github.com/HeiGeAi/heige-codex-skin-studio",
+        "commit": "7712c1f4c34f7802e00d72900311d15242480995",
+        "originalPath": "themes/dragonball-super-saiyan/hero.webp",
+        "sha256": "9b05d1b74abc7936ed2d4f5b80f1aa9f284dd0e5dd7817c2ce7d7a1e52ea473e"
+      }
+    },
+    {
+      "id": "dalao-dianyan",
+      "name": "大佬 · 点烟",
+      "style": "电影暗色",
+      "version": "1.0.1",
+      "author": "HeiGeAi",
+      "description": "深黑电影质感配合暖色高光，适合低亮度专注环境。",
+      "appearance": "dark",
+      "sourceLabel": "社区素材 · HeiGeAi",
+      "sourceFile": "dalao-dianyan.webp",
+      "runtime": "wallpaper",
+      "image": {
+        "mode": "copy"
+      },
+      "background": {
+        "positionX": 50,
+        "positionY": 8,
+        "overlayOpacity": 0.36
+      },
+      "colors": {
+        "accent": "#E09A52",
+        "secondary": "#9AA3B0",
+        "surface": "#111111",
+        "text": "#F2E8DA",
+        "muted": "#B6AA9B",
+        "border": "#44392F"
+      },
+      "effects": {
+        "panelOpacity": 0.84,
+        "panelBlur": 12,
+        "radius": 8
+      },
+      "source": {
+        "kind": "community",
+        "repository": "https://github.com/HeiGeAi/heige-codex-skin-studio",
+        "commit": "7712c1f4c34f7802e00d72900311d15242480995",
+        "originalPath": "themes/dalao-dianyan/hero.webp",
+        "sha256": "489390d9ad49c303438187735e827620778b4e84cb036a8d884d1792ab3ec33e"
+      }
+    },
+    {
+      "id": "wuthering-echo",
+      "name": "鸣潮 · 共鸣",
+      "style": "冷色共鸣",
+      "version": "1.0.1",
+      "author": "HeiGeAi",
+      "description": "青绿色共鸣光效与深紫表面，兼顾辨识度和沉浸感。",
+      "appearance": "dark",
+      "sourceLabel": "社区素材 · HeiGeAi",
+      "sourceFile": "wuthering-echo.webp",
+      "runtime": "wallpaper",
+      "image": {
+        "mode": "copy"
+      },
+      "background": {
+        "positionX": 50,
+        "positionY": 27,
+        "overlayOpacity": 0.32
+      },
+      "colors": {
+        "accent": "#56E0D8",
+        "secondary": "#A98FE8",
+        "surface": "#16121F",
+        "text": "#E4DEF2",
+        "muted": "#AAA1BA",
+        "border": "#3B3348"
+      },
+      "effects": {
+        "panelOpacity": 0.84,
+        "panelBlur": 12,
+        "radius": 8
+      },
+      "source": {
+        "kind": "community",
+        "repository": "https://github.com/HeiGeAi/heige-codex-skin-studio",
+        "commit": "7712c1f4c34f7802e00d72900311d15242480995",
+        "originalPath": "themes/wuthering-echo/hero.webp",
+        "sha256": "d85fabf57ce3ceed3e3f8279898136469b65495c4379f9f471402d3c9541beed"
+      }
+    },
+    {
+      "id": "genshin-dawn",
+      "name": "原神 · 晨曦",
+      "style": "晨光幻想",
+      "version": "1.0.1",
+      "author": "HeiGeAi",
+      "description": "晨光幻想场景配合蓝金色点缀，呈现轻盈明亮的工作区。",
+      "appearance": "light",
+      "sourceLabel": "社区素材 · HeiGeAi",
+      "sourceFile": "genshin-dawn.webp",
+      "runtime": "wallpaper",
+      "image": {
+        "mode": "copy"
+      },
+      "background": {
+        "positionX": 50,
+        "positionY": 24,
+        "overlayOpacity": 0.12
+      },
+      "colors": {
+        "accent": "#5B7FD6",
+        "secondary": "#E0AA3E",
+        "surface": "#F2F1FB",
+        "text": "#2C3A6B",
+        "muted": "#66749A",
+        "border": "#CED4E8"
+      },
+      "effects": {
+        "panelOpacity": 0.9,
+        "panelBlur": 8,
+        "radius": 8
+      },
+      "source": {
+        "kind": "community",
+        "repository": "https://github.com/HeiGeAi/heige-codex-skin-studio",
+        "commit": "7712c1f4c34f7802e00d72900311d15242480995",
+        "originalPath": "themes/genshin-dawn/hero.webp",
+        "sha256": "75f0ceb98028492d88bdeca77da955a1b9d06d09b2dddb0cc3a5301c91621773"
+      }
+    }
+  ]
+}

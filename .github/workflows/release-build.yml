@@ -1,0 +1,99 @@
+name: Release Build
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-build-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: win
+            os: windows-latest
+            command: npm run dist:win
+            artifact: release/win
+          - platform: mac
+            os: macos-latest
+            command: npm run dist:mac
+            artifact: release/mac
+          - platform: linux
+            os: ubuntu-22.04
+            command: npm run dist:linux
+            artifact: release/linux
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: package-lock.json
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.14'
+
+      - name: Verify lightweight application configuration
+        run: node scripts/verify-mobile-runtime.mjs ${{ matrix.platform }}
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - name: Install macOS universal targets
+        if: matrix.platform == 'mac'
+        run: rustup target add aarch64-apple-darwin x86_64-apple-darwin
+
+      - name: Install Linux dependencies
+        if: matrix.platform == 'linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev patchelf
+
+      - run: npm ci
+
+      - run: npm run test:release-tooling
+      - run: npm run test:release-remote
+      - run: npm run verify:platform
+      - run: npm run verify:workflows
+      - run: npm run verify:release
+
+      - name: Prepare verified release tools
+        if: matrix.platform == 'win' || matrix.platform == 'linux'
+        timeout-minutes: 10
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: node scripts/prepare-release-tools.mjs
+
+      - name: Build signed release
+        env:
+          VITE_GAOGE_BOOTSTRAP_CONFIG_URLS: ${{ vars.VITE_GAOGE_BOOTSTRAP_CONFIG_URLS }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+          GAOGE_UPDATE_BASE_URL: ${{ vars.GAOGE_UPDATE_BASE_URL }}
+          GAOGE_UPDATE_MINIMUM_VERSION: ${{ vars.GAOGE_UPDATE_MINIMUM_VERSION }}
+          GAOGE_WINDOWS_SIGNING_REQUIRED: "false"
+          GAOGE_WINDOWS_PFX_BASE64: ${{ secrets.GAOGE_WINDOWS_PFX_BASE64 }}
+          GAOGE_WINDOWS_PFX_PASSWORD: ${{ secrets.GAOGE_WINDOWS_PFX_PASSWORD }}
+          GAOGE_WINDOWS_CERTIFICATE_THUMBPRINT: ${{ secrets.GAOGE_WINDOWS_CERTIFICATE_THUMBPRINT }}
+          GAOGE_WINDOWS_TIMESTAMP_URL: ${{ vars.GAOGE_WINDOWS_TIMESTAMP_URL }}
+        run: ${{ matrix.command }}
+
+      - name: Verify release artifacts
+        run: npm run verify:artifacts -- --platform ${{ matrix.platform }}
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: gaoge-free-${{ matrix.platform }}
+          path: ${{ matrix.artifact }}
+          if-no-files-found: error
+          retention-days: 14

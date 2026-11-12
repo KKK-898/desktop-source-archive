@@ -1,0 +1,430 @@
+[
+  {
+    "id": "openai",
+    "name": "OpenAI Official",
+    "baseUrl": "https://api.openai.com/v1",
+    "protocol": "responses",
+    "model": "gpt-5.5",
+    "modelList": [],
+    "category": "official",
+    "websiteUrl": "https://chatgpt.com/codex",
+    "sourcePath": "apps/codex-plus-manager/src/presets.ts",
+    "sourceLine": 36,
+    "sourceRevision": "38033bf98325a32bbb80842441e2e0e2b3c9d7bd"
+  },
+  {
+    "id": "deepseek",
+    "name": "DeepSeek",
+    "baseUrl": "https://api.deepseek.com/",
+    "protocol": "responses",
+    "model": "deepseek-v4-flash",
+    "modelList": [
+      "deepseek-v4-flash",
+      "deepseek-v4-pro"
+    ],
+    "category": "cn_official",
+    "apiKeyUrl": "https://platform.deepseek.com/api_keys",
+    "websiteUrl": "https://platform.deepseek.com",
+    "sourcePath": "apps/codex-plus-manager/src/presets.ts",
+    "sourceLine": 47,
+    "sourceRevision": "38033bf98325a32bbb80842441e2e0e2b3c9d7bd"
+  },
+  {
+    "id": "zhipu-glm",
+    "name": "Zhipu GLM",
+    "baseUrl": "https://open.bigmodel.cn/api/coding/paas/v4",
+    "protocol": "chatCompletions",
+    "model": "glm-5.1",
+    "modelList": [
+      "glm-5.1"
+    ],
+    "category": "cn_official",
+    "apiKeyUrl": "https://www.bigmodel.cn/claude-code?ic=RRVJPB5SII",
+    "websiteUrl": "https://open.bigmodel.cn",
+    "sourcePath": "apps/codex-plus-manager/src/presets.ts",
+    "sourceLine": 58,
+    "sourceRevision": "38033bf98325a32bbb80842441e2e0e2b3c9d7bd"
+  },
+  {
+    "id": "kimi",
+    "name": "Kimi",
+    "baseUrl": "https://api.moonshot.cn/v1",
+    "protocol": "chatCompletions",
+    "model": "kimi-k2.6",
+    "modelList": [
+      "kimi-k2.6"
+    ],
+    "category": "cn_official",
+    "apiKeyUrl": "https://platform.moonshot.cn/console/api-keys",
+    "websiteUrl": "https://platform.moonshot.cn",
+    "sourcePath": "apps/codex-plus-manager/src/presets.ts",
+    "sourceLine": 69,
+    "sourceRevision": "38033bf98325a32bbb80842441e2e0e2b3c9d7bd"
+  },
+  {
+    "id": "bailian",
+    "name": "Bailian (Qwen)",
+    "baseUrl": "https://dashscope.aliyuncs.com/compatible-mode/v1",
+    "protocol": "chatCompletions",
+    "model": "qwen3-coder-plus",
+    "modelList": [
+      "qwen3-coder-plus",
+      "qwen3-max"
+    ],
+    "category": "cn_official",
+    "apiKeyUrl": "https://bailian.console.aliyun.com/#/api-key",
+    "websiteUrl": "https://bailian.console.aliyun.com",
+    "sourcePath": "apps/codex-plus-manager/src/presets.ts",
+    "sourceLine": 80,
+    "sourceRevision": "38033bf98325a32bbb80842441e2e0e2b3c9d7bd"
+  },
+  {
+    "id": "stepfun",
+    "name": "StepFun",
+    "baseUrl": "https://api.stepfun.com/step_plan/v1",
+    "protocol": "chatCompletions",
+    "model": "step-3.5-flash-2603",
+    "modelList": [
+      "step-3.5-flash-2603",
+      "step-3.5-flash"
+    ],
+    "category": "cn_official",
+    "apiKeyUrl": "https://platform.stepfun.com/interface-key",
+    "websiteUrl": "https://platform.stepfun.com/step-plan",
+    "sourcePath": "apps/codex-plus-manager/src/presets.ts",
+    "sourceLine": 91,
+    "sourceRevision": "38033bf98325a32bbb80842441e2e0e2b3c9d7bd"
+  },
+  {
+    "id": "minimax",
+    "name": "MiniMax (China)",
+    "baseUrl": "https://api.minimaxi.com/v1",
+    "protocol": "chatCompletions",
+    "model": "MiniMax-M3",
+    "modelList": [
+      "MiniMax-M3",
+      "MiniMax-M2.7"
+    ],
+    "category": "cn_official",
+    "apiKeyUrl": "https://platform.minimaxi.com/subscribe/coding-plan",
+    "websiteUrl": "https://platform.minimaxi.com",
+    "sourcePath": "apps/codex-plus-manager/src/presets.ts",
+    "sourceLine": 102,
+    "sourceRevision": "38033bf98325a32bbb80842441e2e0e2b3c9d7bd"
+  },
+  {
+    "id": "minimax-global",
+    "name": "MiniMax (Global)",
+    "baseUrl": "https://api.minimax.io/v1",
+    "protocol": "chatCompletions",
+    "model": "MiniMax-M3",
+    "modelList": [
+      "MiniMax-M3",
+      "MiniMax-M2.7"
+    ],
+    "category": "official",
+    "apiKeyUrl": "https://platform.minimax.io/subscribe/coding-plan",
+    "websiteUrl": "https://platform.minimax.io",
+    "sourcePath": "apps/codex-plus-manager/src/presets.ts",
+    "sourceLine": 113,
+    "sourceRevision": "38033bf98325a32bbb80842441e2e0e2b3c9d7bd"
+  },
+  {
+    "id": "volcano-ark",
+    "name": "火山引擎 Ark",
+    "baseUrl": "https://ark.cn-beijing.volces.com/api/coding/v3",
+    "protocol": "chatCompletions",
+    "model": "ark-code-latest",
+    "modelList": [
+      "ark-code-latest"
+    ],
+    "category": "cn_official",
+    "apiKeyUrl": "https://console.volcengine.com/ark/region:ark+cn-beijing/apiKey",
+    "websiteUrl": "https://www.volcengine.com/product/ark",
+    "sourcePath": "apps/codex-plus-manager/src/presets.ts",
+    "sourceLine": 124,
+    "sourceRevision": "38033bf98325a32bbb80842441e2e0e2b3c9d7bd"
+  },
+  {
+    "id": "baidu-qianfan",
+    "name": "百度千帆 Coding Plan",
+    "baseUrl": "https://qianfan.baidubce.com/v2/coding",
+    "protocol": "chatCompletions",
+    "model": "qianfan-code-latest",
+    "modelList": [],
+    "category": "cn_official",
+    "websiteUrl": "https://cloud.baidu.com/product/qianfan_modelbuilder",
+    "sourcePath": "apps/codex-plus-manager/src/presets.ts",
+    "sourceLine": 135,
+    "sourceRevision": "38033bf98325a32bbb80842441e2e0e2b3c9d7bd"
+  },
+  {
+    "id": "xiaomi-mimo",
+    "name": "小米 MiMo",
+    "baseUrl": "https://api.xiaomimimo.com/v1",
+    "protocol": "chatCompletions",
+    "model": "mimo-v2.5-pro",
+    "modelList": [
+      "mimo-v2.5-pro"
+    ],
+    "category": "cn_official",
+    "websiteUrl": "https://platform.xiaomimimo.com",
+    "sourcePath": "apps/codex-plus-manager/src/presets.ts",
+    "sourceLine": 144,
+    "sourceRevision": "38033bf98325a32bbb80842441e2e0e2b3c9d7bd"
+  },
+  {
+    "id": "modelscope",
+    "name": "ModelScope",
+    "baseUrl": "https://api-inference.modelscope.cn/v1",
+    "protocol": "chatCompletions",
+    "model": "ZhipuAI/GLM-5.1",
+    "modelList": [
+      "ZhipuAI/GLM-5.1"
+    ],
+    "category": "cn_official",
+    "websiteUrl": "https://modelscope.cn",
+    "sourcePath": "apps/codex-plus-manager/src/presets.ts",
+    "sourceLine": 154,
+    "sourceRevision": "38033bf98325a32bbb80842441e2e0e2b3c9d7bd"
+  },
+  {
+    "id": "longcat",
+    "name": "Longcat",
+    "baseUrl": "https://api.longcat.chat/openai/v1",
+    "protocol": "chatCompletions",
+    "model": "LongCat-Flash-Chat",
+    "modelList": [
+      "LongCat-Flash-Chat"
+    ],
+    "category": "cn_official",
+    "websiteUrl": "https://longcat.chat/platform",
+    "sourcePath": "apps/codex-plus-manager/src/presets.ts",
+    "sourceLine": 164,
+    "sourceRevision": "38033bf98325a32bbb80842441e2e0e2b3c9d7bd"
+  },
+  {
+    "id": "jojocode-max",
+    "name": "JOJO Code",
+    "baseUrl": "https://max2.jojocode.com/v1",
+    "protocol": "responses",
+    "model": "",
+    "modelList": [],
+    "category": "aggregator",
+    "apiKeyUrl": "https://max2.jojocode.com/",
+    "websiteUrl": "https://max2.jojocode.com/",
+    "sourcePath": "apps/codex-plus-manager/src/presets.ts",
+    "sourceLine": 176,
+    "sourceRevision": "38033bf98325a32bbb80842441e2e0e2b3c9d7bd"
+  },
+  {
+    "id": "runapi",
+    "name": "RunAPI",
+    "baseUrl": "https://runapi.host/v1",
+    "protocol": "responses",
+    "model": "gpt-5.5",
+    "modelList": [],
+    "category": "aggregator",
+    "apiKeyUrl": "https://runapi.host",
+    "websiteUrl": "https://runapi.host",
+    "sourcePath": "apps/codex-plus-manager/src/presets.ts",
+    "sourceLine": 187,
+    "sourceRevision": "38033bf98325a32bbb80842441e2e0e2b3c9d7bd"
+  },
+  {
+    "id": "siliconflow",
+    "name": "SiliconFlow",
+    "baseUrl": "https://api.siliconflow.cn/v1",
+    "protocol": "chatCompletions",
+    "model": "Pro/MiniMaxAI/MiniMax-M2.7",
+    "modelList": [
+      "Pro/MiniMaxAI/MiniMax-M2.7"
+    ],
+    "category": "aggregator",
+    "apiKeyUrl": "https://cloud.siliconflow.cn/i/drGuwc9k",
+    "websiteUrl": "https://siliconflow.cn",
+    "sourcePath": "apps/codex-plus-manager/src/presets.ts",
+    "sourceLine": 197,
+    "sourceRevision": "38033bf98325a32bbb80842441e2e0e2b3c9d7bd"
+  },
+  {
+    "id": "openrouter",
+    "name": "OpenRouter",
+    "baseUrl": "https://openrouter.ai/api/v1",
+    "protocol": "chatCompletions",
+    "model": "gpt-5.5",
+    "modelList": [],
+    "category": "aggregator",
+    "apiKeyUrl": "https://openrouter.ai/keys",
+    "websiteUrl": "https://openrouter.ai",
+    "sourcePath": "apps/codex-plus-manager/src/presets.ts",
+    "sourceLine": 208,
+    "sourceRevision": "38033bf98325a32bbb80842441e2e0e2b3c9d7bd"
+  },
+  {
+    "id": "aihubmix",
+    "name": "AiHubMix",
+    "baseUrl": "https://aihubmix.com/v1",
+    "protocol": "responses",
+    "model": "gpt-5.5",
+    "modelList": [],
+    "category": "aggregator",
+    "websiteUrl": "https://aihubmix.com",
+    "sourcePath": "apps/codex-plus-manager/src/presets.ts",
+    "sourceLine": 218,
+    "sourceRevision": "38033bf98325a32bbb80842441e2e0e2b3c9d7bd"
+  },
+  {
+    "id": "apikeyfun",
+    "name": "APIKEY.FUN",
+    "baseUrl": "https://api.apikey.fun/v1",
+    "protocol": "responses",
+    "model": "gpt-5.5",
+    "modelList": [
+      "gpt-5.5"
+    ],
+    "category": "aggregator",
+    "websiteUrl": "https://apikey.fun",
+    "sourcePath": "apps/codex-plus-manager/src/presets.ts",
+    "sourceLine": 227,
+    "sourceRevision": "38033bf98325a32bbb80842441e2e0e2b3c9d7bd"
+  },
+  {
+    "id": "cccccc-api",
+    "name": "ccccccAPI",
+    "baseUrl": "https://dzhsmartai.com/v1",
+    "protocol": "responses",
+    "model": "",
+    "modelList": [],
+    "category": "aggregator",
+    "apiKeyUrl": "https://dzhsmartai.com/register?promo=CODEXPLUSPLUS",
+    "websiteUrl": "https://dzhsmartai.com",
+    "sourcePath": "apps/codex-plus-manager/src/presets.ts",
+    "sourceLine": 237,
+    "sourceRevision": "38033bf98325a32bbb80842441e2e0e2b3c9d7bd"
+  },
+  {
+    "id": "tokenmy",
+    "name": "TokenMy",
+    "baseUrl": "https://agent.tokenmy.ai/v1",
+    "protocol": "responses",
+    "model": "",
+    "modelList": [],
+    "category": "aggregator",
+    "apiKeyUrl": "https://agent.tokenmy.ai",
+    "websiteUrl": "https://agent.tokenmy.ai",
+    "sourcePath": "apps/codex-plus-manager/src/presets.ts",
+    "sourceLine": 248,
+    "sourceRevision": "38033bf98325a32bbb80842441e2e0e2b3c9d7bd"
+  },
+  {
+    "id": "novita",
+    "name": "Novita AI",
+    "baseUrl": "https://api.novita.ai/openai/v1",
+    "protocol": "chatCompletions",
+    "model": "zai-org/glm-5.1",
+    "modelList": [
+      "zai-org/glm-5.1"
+    ],
+    "category": "aggregator",
+    "websiteUrl": "https://novita.ai",
+    "sourcePath": "apps/codex-plus-manager/src/presets.ts",
+    "sourceLine": 259,
+    "sourceRevision": "38033bf98325a32bbb80842441e2e0e2b3c9d7bd"
+  },
+  {
+    "id": "azure",
+    "name": "Azure OpenAI",
+    "baseUrl": "https://YOUR_RESOURCE_NAME.openai.azure.com/openai",
+    "protocol": "responses",
+    "model": "gpt-5.5",
+    "modelList": [],
+    "category": "third_party",
+    "websiteUrl": "https://learn.microsoft.com/en-us/azure/ai-foundry/openai/how-to/codex",
+    "sourcePath": "apps/codex-plus-manager/src/presets.ts",
+    "sourceLine": 271,
+    "sourceRevision": "38033bf98325a32bbb80842441e2e0e2b3c9d7bd"
+  },
+  {
+    "id": "anthropic",
+    "name": "Anthropic",
+    "baseUrl": "https://api.anthropic.com",
+    "protocol": "anthropicMessages",
+    "model": "claude-sonnet-5-5",
+    "modelList": [
+      "claude-opus-5-5",
+      "claude-sonnet-5-5",
+      "claude-haiku-5-5"
+    ],
+    "category": "vendor",
+    "apiKeyUrl": "https://console.anthropic.com/settings/keys",
+    "sourcePath": "apps/codex-plus-manager/src/gateway-model.ts",
+    "sourceLine": 1121,
+    "sourceRevision": "38033bf98325a32bbb80842441e2e0e2b3c9d7bd"
+  },
+  {
+    "id": "xai",
+    "name": "xAI",
+    "baseUrl": "https://api.x.ai/v1",
+    "protocol": "chatCompletions",
+    "model": "",
+    "modelList": [],
+    "category": "vendor",
+    "apiKeyUrl": "https://console.x.ai",
+    "sourcePath": "apps/codex-plus-manager/src/gateway-model.ts",
+    "sourceLine": 1131,
+    "sourceRevision": "38033bf98325a32bbb80842441e2e0e2b3c9d7bd"
+  },
+  {
+    "id": "opencode-go",
+    "name": "OpenCode Go",
+    "baseUrl": "https://opencode.ai/zen/go/v1",
+    "protocol": "chatCompletions",
+    "model": "",
+    "modelList": [],
+    "category": "relay",
+    "apiKeyUrl": "https://opencode.ai/auth",
+    "sourcePath": "apps/codex-plus-manager/src/gateway-model.ts",
+    "sourceLine": 1143,
+    "sourceRevision": "38033bf98325a32bbb80842441e2e0e2b3c9d7bd"
+  },
+  {
+    "id": "opencode-zen",
+    "name": "OpenCode Zen",
+    "baseUrl": "https://opencode.ai/zen/v1",
+    "protocol": "chatCompletions",
+    "model": "",
+    "modelList": [],
+    "category": "relay",
+    "apiKeyUrl": "https://opencode.ai/auth",
+    "sourcePath": "apps/codex-plus-manager/src/gateway-model.ts",
+    "sourceLine": 1153,
+    "sourceRevision": "38033bf98325a32bbb80842441e2e0e2b3c9d7bd"
+  },
+  {
+    "id": "ollama",
+    "name": "Ollama",
+    "baseUrl": "http://127.0.0.1:11434/v1",
+    "protocol": "chatCompletions",
+    "model": "",
+    "modelList": [],
+    "category": "local",
+    "defaultKey": "ollama",
+    "sourcePath": "apps/codex-plus-manager/src/gateway-model.ts",
+    "sourceLine": 1163,
+    "sourceRevision": "38033bf98325a32bbb80842441e2e0e2b3c9d7bd"
+  },
+  {
+    "id": "lm-studio",
+    "name": "LM Studio",
+    "baseUrl": "http://127.0.0.1:1234/v1",
+    "protocol": "chatCompletions",
+    "model": "",
+    "modelList": [],
+    "category": "local",
+    "defaultKey": "lm-studio",
+    "sourcePath": "apps/codex-plus-manager/src/gateway-model.ts",
+    "sourceLine": 1173,
+    "sourceRevision": "38033bf98325a32bbb80842441e2e0e2b3c9d7bd"
+  }
+]

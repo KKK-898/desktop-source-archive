@@ -1,0 +1,1335 @@
+{
+  "schemaVersion": 1,
+  "version": "1.7.1",
+  "sourceCommit": "5e7c48e6999e8d3116239b5fa043837a6d08229a",
+  "sourceTree": "51e331f7a2fc224edf93ad2e581c6c104a5eae34",
+  "sourceMode": "git-ref",
+  "releaseReady": true,
+  "exclusions": [
+    {
+      "path": ".vscode/extensions.json",
+      "reason": "local tooling, preview or development-only artifact"
+    },
+    {
+      "path": "SOURCE_IMPORT_NOTES.md",
+      "reason": "non-build local root artifact"
+    },
+    {
+      "path": "build/icon-debug/build-exe.png",
+      "reason": "local tooling, preview or development-only artifact"
+    },
+    {
+      "path": "build/icon-debug/configured-ico.png",
+      "reason": "local tooling, preview or development-only artifact"
+    },
+    {
+      "path": "build/icon-debug/installed.png",
+      "reason": "local tooling, preview or development-only artifact"
+    },
+    {
+      "path": "build/icon-source/configured-icon-preview.png",
+      "reason": "local tooling, preview or development-only artifact"
+    },
+    {
+      "path": "build/icon-source/embedded-exe-icon.png",
+      "reason": "local tooling, preview or development-only artifact"
+    },
+    {
+      "path": "docs/balance-backend-validation-status.md",
+      "reason": "internal operational or validation notes; not a build input"
+    },
+    {
+      "path": "docs/balance-isolated-validation-status.md",
+      "reason": "internal operational or validation notes; not a build input"
+    },
+    {
+      "path": "docs/codex-account-balance-recovery-2026-11-11.md",
+      "reason": "internal operational or validation notes; not a build input"
+    },
+    {
+      "path": "docs/codex-aggregate-compatibility.md",
+      "reason": "internal operational or validation notes; not a build input"
+    },
+    {
+      "path": "docs/codex-aggregate-exit-recovery-2026-11-12.md",
+      "reason": "internal operational or validation notes; not a build input"
+    },
+    {
+      "path": "docs/codex-aggregate-menu-login-2026-11-11.md",
+      "reason": "internal operational or validation notes; not a build input"
+    },
+    {
+      "path": "docs/codex-aggregate-repair-2026-11-11.md",
+      "reason": "internal operational or validation notes; not a build input"
+    },
+    {
+      "path": "docs/codex-api-login-restore-2026-11-08.md",
+      "reason": "internal operational or validation notes; not a build input"
+    },
+    {
+      "path": "docs/codex-api-mode-compatibility.md",
+      "reason": "internal operational or validation notes; not a build input"
+    },
+    {
+      "path": "docs/codex-api-onboarding-2026-11-09.md",
+      "reason": "internal operational or validation notes; not a build input"
+    },
+    {
+      "path": "docs/codex-api-project-compatibility-2026-11-08.md",
+      "reason": "internal operational or validation notes; not a build input"
+    },
+    {
+      "path": "docs/codex-api-project-compatibility-2026-11-09.md",
+      "reason": "internal operational or validation notes; not a build input"
+    },
+    {
+      "path": "docs/codex-api-project-state-native-2026-11-09.md",
+      "reason": "internal operational or validation notes; not a build input"
+    },
+    {
+      "path": "docs/codex-fuel-quota-compatibility.md",
+      "reason": "internal operational or validation notes; not a build input"
+    },
+    {
+      "path": "docs/codex-native-chinese-ui-2026-11-10.md",
+      "reason": "internal operational or validation notes; not a build input"
+    },
+    {
+      "path": "docs/codex-native-fast-ultra-compatibility-2026-11-10.md",
+      "reason": "internal operational or validation notes; not a build input"
+    },
+    {
+      "path": "docs/codex-plain-text-paste-compatibility-2026-11-10.md",
+      "reason": "internal operational or validation notes; not a build input"
+    },
+    {
+      "path": "docs/codex-plugin-market-integration-2026-11-10.md",
+      "reason": "internal operational or validation notes; not a build input"
+    },
+    {
+      "path": "docs/codex-plugin-sidebar-theme-2026-11-11.md",
+      "reason": "internal operational or validation notes; not a build input"
+    },
+    {
+      "path": "docs/codex-plugin-toggle-compatibility-2026-11-10.md",
+      "reason": "internal operational or validation notes; not a build input"
+    },
+    {
+      "path": "docs/codex-session-import.md",
+      "reason": "internal operational or validation notes; not a build input"
+    },
+    {
+      "path": "docs/codex-session-sync-performance.md",
+      "reason": "internal operational or validation notes; not a build input"
+    },
+    {
+      "path": "docs/codex-ultra-reliability-2026-11-05.md",
+      "reason": "internal operational or validation notes; not a build input"
+    },
+    {
+      "path": "docs/gaoge-image-26-gif.md",
+      "reason": "internal operational or validation notes; not a build input"
+    },
+    {
+      "path": "docs/gaoge-image-fast-path.md",
+      "reason": "internal operational or validation notes; not a build input"
+    },
+    {
+      "path": "docs/login-brand-wall.md",
+      "reason": "internal operational or validation notes; not a build input"
+    },
+    {
+      "path": "docs/mobile-components.md",
+      "reason": "internal operational or validation notes; not a build input"
+    },
+    {
+      "path": "docs/one-click-release.md",
+      "reason": "internal operational or validation notes; not a build input"
+    },
+    {
+      "path": "docs/release-1.6.2.md",
+      "reason": "internal operational or validation notes; not a build input"
+    },
+    {
+      "path": "docs/release-1.6.3.md",
+      "reason": "internal operational or validation notes; not a build input"
+    },
+    {
+      "path": "docs/release-1.6.4.md",
+      "reason": "internal operational or validation notes; not a build input"
+    },
+    {
+      "path": "docs/release-1.6.5.md",
+      "reason": "internal operational or validation notes; not a build input"
+    },
+    {
+      "path": "docs/release-1.6.6.md",
+      "reason": "internal operational or validation notes; not a build input"
+    },
+    {
+      "path": "docs/release-1.6.7.md",
+      "reason": "internal operational or validation notes; not a build input"
+    },
+    {
+      "path": "docs/release-1.6.8.md",
+      "reason": "internal operational or validation notes; not a build input"
+    },
+    {
+      "path": "docs/release-1.6.9.md",
+      "reason": "internal operational or validation notes; not a build input"
+    },
+    {
+      "path": "docs/release-1.7.0.md",
+      "reason": "internal operational or validation notes; not a build input"
+    },
+    {
+      "path": "docs/releases/1.5.4.md",
+      "reason": "internal operational or validation notes; not a build input"
+    },
+    {
+      "path": "docs/releases/1.5.5.md",
+      "reason": "internal operational or validation notes; not a build input"
+    },
+    {
+      "path": "docs/releases/1.5.6.md",
+      "reason": "internal operational or validation notes; not a build input"
+    },
+    {
+      "path": "docs/releases/1.5.7.md",
+      "reason": "internal operational or validation notes; not a build input"
+    },
+    {
+      "path": "docs/releases/1.5.8.md",
+      "reason": "internal operational or validation notes; not a build input"
+    },
+    {
+      "path": "docs/releases/1.5.9.md",
+      "reason": "internal operational or validation notes; not a build input"
+    },
+    {
+      "path": "docs/releases/1.6.3.md",
+      "reason": "internal operational or validation notes; not a build input"
+    },
+    {
+      "path": "docs/releases/1.6.4.md",
+      "reason": "internal operational or validation notes; not a build input"
+    },
+    {
+      "path": "docs/releases/1.6.5.md",
+      "reason": "internal operational or validation notes; not a build input"
+    },
+    {
+      "path": "docs/releases/1.6.6.md",
+      "reason": "internal operational or validation notes; not a build input"
+    },
+    {
+      "path": "docs/runtime-server-directory.md",
+      "reason": "internal operational or validation notes; not a build input"
+    },
+    {
+      "path": "docs/tutorial-videos.md",
+      "reason": "internal operational or validation notes; not a build input"
+    },
+    {
+      "path": "docs/新版主题开发文档.md",
+      "reason": "internal operational or validation notes; not a build input"
+    },
+    {
+      "path": "docs/桌面开发版启动备注.md",
+      "reason": "internal operational or validation notes; not a build input"
+    },
+    {
+      "path": "icon-check/codex-shortcut-target.png",
+      "reason": "local tooling, preview or development-only artifact"
+    },
+    {
+      "path": "icon-check/desktop-installer.png",
+      "reason": "local tooling, preview or development-only artifact"
+    },
+    {
+      "path": "icon-check/installed-app.png",
+      "reason": "local tooling, preview or development-only artifact"
+    },
+    {
+      "path": "icon-check/release-app.png",
+      "reason": "local tooling, preview or development-only artifact"
+    },
+    {
+      "path": "migration-preview.png",
+      "reason": "non-build local root artifact"
+    },
+    {
+      "path": "mobile-bridge/DEPLOYMENT.txt",
+      "reason": "private deployment record; source/build instructions retained separately"
+    },
+    {
+      "path": "probe-diag.bat",
+      "reason": "non-build local root artifact"
+    },
+    {
+      "path": "probe-diag.ps1",
+      "reason": "non-build local root artifact"
+    },
+    {
+      "path": "scripts/deploy-mobile-components.py",
+      "reason": "private operator deployment entry point; not a build/runtime dependency"
+    },
+    {
+      "path": "scripts/deploy-mobile-relay.py",
+      "reason": "private operator deployment entry point; not a build/runtime dependency"
+    }
+  ],
+  "replacements": [
+    {
+      "path": "docs/cross-platform-release.md",
+      "from": "scripts/public-source-docs/cross-platform-release.md",
+      "sha256": "40086a42e238b7432581f2e498b72092a9e7a33557406ee0760cdc1182e0ac29"
+    },
+    {
+      "path": "docs/release-1.7.1.md",
+      "from": "scripts/public-source-docs/release-1.7.1.md",
+      "sha256": "5542a57acca4953f5d5b28f6af8ad8b316ed18a0fbb0083cb37c531f0f342505"
+    },
+    {
+      "path": "docs/remote-updates.md",
+      "from": "scripts/public-source-docs/remote-updates.md",
+      "sha256": "748f02605051f0ccd24b30b7663a73fbdef14193cc574c5823c9724bf281c78f"
+    },
+    {
+      "path": "scripts/publish-update.ps1",
+      "from": "scripts/public-source-docs/publish-update.ps1",
+      "sha256": "215e39496d7eeccc372950732a101239d5b9b24b3bc38ca21d476e0d2ad9a39a"
+    }
+  ],
+  "checks": [
+    {
+      "name": "no_symlinks_or_submodules",
+      "ok": true,
+      "issues": []
+    },
+    {
+      "name": "portable_source_paths",
+      "ok": true,
+      "issues": []
+    },
+    {
+      "name": "sensitive_source_paths",
+      "ok": true,
+      "issues": []
+    },
+    {
+      "name": "required_build_and_license_files",
+      "ok": true,
+      "issues": []
+    },
+    {
+      "name": "matching_release_versions",
+      "ok": true,
+      "issues": []
+    },
+    {
+      "name": "project_license_metadata",
+      "ok": true,
+      "issues": []
+    },
+    {
+      "name": "rust_embedded_source_inputs",
+      "ok": true,
+      "issues": []
+    },
+    {
+      "name": "frontend_relative_imports_and_assets",
+      "ok": true,
+      "issues": []
+    },
+    {
+      "name": "tauri_resources_or_locked_dependencies",
+      "ok": true,
+      "issues": []
+    },
+    {
+      "name": "high_confidence_secret_patterns",
+      "ok": true,
+      "issues": []
+    },
+    {
+      "name": "owner_release_scope_preserved",
+      "ok": true,
+      "issues": []
+    },
+    {
+      "name": "rights_audit",
+      "ok": true,
+      "issues": []
+    },
+    {
+      "name": "owner_release_disclosures_complete",
+      "ok": true,
+      "issues": []
+    },
+    {
+      "name": "committed_release_source",
+      "ok": true,
+      "issues": []
+    },
+    {
+      "name": "publication_mode",
+      "ok": true,
+      "issues": []
+    }
+  ],
+  "rightsFindings": [],
+  "rightsDisclosures": [
+    {
+      "path": "resources/codex-locales/zh-CN.pak",
+      "status": "unverified-language-pack",
+      "reason": "Bundled binary existed at initial source import; no matching upstream source, generation recipe or redistributable license notice was located. New native locale path no longer needs the old installation workflow, but Tauri still bundles this payload.",
+      "sha256": "2fcc82972ec5b9b3d1c7adbe7f5ccebbcec8f592383fd835c134a03e82bf8a24",
+      "releaseDecision": {
+        "type": "owner-directed-publication",
+        "decisionId": "gaoge-1.7.1-2026-11-12",
+        "version": "1.7.1",
+        "sha256": "2fcc82972ec5b9b3d1c7adbe7f5ccebbcec8f592383fd835c134a03e82bf8a24",
+        "evidence": [
+          {
+            "path": "scripts/public-source-docs/owner-release-decision-1.7.1.md",
+            "sha256": "a95d09b14f963a65fe2a07e6cd3929a85c83a10185fc7afda4538f2b94f05704"
+          }
+        ],
+        "acknowledgesUnverifiedRights": true
+      }
+    },
+    {
+      "path": "scripts/codex-plugin-patch.cjs",
+      "status": "unverified-embedded-proprietary-native-query",
+      "reason": "Contains exact or apparently exact native Codex implementation extracted from installed application bundles. Permission for public source redistribution is not established; dynamic local inspection is a separate issue.",
+      "sha256": "a4b4bda741c18b825bd2dd9264f9ff60c96cc6b2eeaae7b49edc4a66901b0f16",
+      "releaseDecision": {
+        "type": "owner-directed-publication",
+        "decisionId": "gaoge-1.7.1-2026-11-12",
+        "version": "1.7.1",
+        "sha256": "a4b4bda741c18b825bd2dd9264f9ff60c96cc6b2eeaae7b49edc4a66901b0f16",
+        "evidence": [
+          {
+            "path": "scripts/public-source-docs/owner-release-decision-1.7.1.md",
+            "sha256": "a95d09b14f963a65fe2a07e6cd3929a85c83a10185fc7afda4538f2b94f05704"
+          }
+        ],
+        "acknowledgesUnverifiedRights": true
+      }
+    },
+    {
+      "path": "scripts/fixtures/codex-aggregate-selection-26.1103.js",
+      "status": "unverified-proprietary-native-code",
+      "reason": "Contains exact or apparently exact native Codex implementation extracted from installed application bundles. Permission for public source redistribution is not established; dynamic local inspection is a separate issue.",
+      "sha256": "9480c8024d6d085ab5b8ddfad0dcfcb15d17bbb9799b506a6347ce64e2c207bd",
+      "releaseDecision": {
+        "type": "owner-directed-publication",
+        "decisionId": "gaoge-1.7.1-2026-11-12",
+        "version": "1.7.1",
+        "sha256": "9480c8024d6d085ab5b8ddfad0dcfcb15d17bbb9799b506a6347ce64e2c207bd",
+        "evidence": [
+          {
+            "path": "scripts/public-source-docs/owner-release-decision-1.7.1.md",
+            "sha256": "a95d09b14f963a65fe2a07e6cd3929a85c83a10185fc7afda4538f2b94f05704"
+          }
+        ],
+        "acknowledgesUnverifiedRights": true
+      }
+    },
+    {
+      "path": "scripts/fixtures/codex-model-filter-26.1007.js",
+      "status": "unverified-proprietary-native-code",
+      "reason": "Contains exact or apparently exact native Codex implementation extracted from installed application bundles. Permission for public source redistribution is not established; dynamic local inspection is a separate issue.",
+      "sha256": "ab7a77f5391828dc7b501aa6b6213fff91e5a6773ce6139521e2c48f473aa1f7",
+      "releaseDecision": {
+        "type": "owner-directed-publication",
+        "decisionId": "gaoge-1.7.1-2026-11-12",
+        "version": "1.7.1",
+        "sha256": "ab7a77f5391828dc7b501aa6b6213fff91e5a6773ce6139521e2c48f473aa1f7",
+        "evidence": [
+          {
+            "path": "scripts/public-source-docs/owner-release-decision-1.7.1.md",
+            "sha256": "a95d09b14f963a65fe2a07e6cd3929a85c83a10185fc7afda4538f2b94f05704"
+          }
+        ],
+        "acknowledgesUnverifiedRights": true
+      }
+    },
+    {
+      "path": "scripts/fixtures/codex-model-filter-26.901.js",
+      "status": "unverified-proprietary-native-code",
+      "reason": "Contains exact or apparently exact native Codex implementation extracted from installed application bundles. Permission for public source redistribution is not established; dynamic local inspection is a separate issue.",
+      "sha256": "a887e17facf6671dea23df0ae90f3e243f7d01ef9340149aa2ef0c98bd98eba7",
+      "releaseDecision": {
+        "type": "owner-directed-publication",
+        "decisionId": "gaoge-1.7.1-2026-11-12",
+        "version": "1.7.1",
+        "sha256": "a887e17facf6671dea23df0ae90f3e243f7d01ef9340149aa2ef0c98bd98eba7",
+        "evidence": [
+          {
+            "path": "scripts/public-source-docs/owner-release-decision-1.7.1.md",
+            "sha256": "a95d09b14f963a65fe2a07e6cd3929a85c83a10185fc7afda4538f2b94f05704"
+          }
+        ],
+        "acknowledgesUnverifiedRights": true
+      }
+    },
+    {
+      "path": "scripts/fixtures/codex-service-tier-gate-26.915.js",
+      "status": "unverified-proprietary-native-code",
+      "reason": "Contains exact or apparently exact native Codex implementation extracted from installed application bundles. Permission for public source redistribution is not established; dynamic local inspection is a separate issue.",
+      "sha256": "c494c3fd30d9cc8dd8098e0b072791f4f437582cb92083b6797016d5a090695a",
+      "releaseDecision": {
+        "type": "owner-directed-publication",
+        "decisionId": "gaoge-1.7.1-2026-11-12",
+        "version": "1.7.1",
+        "sha256": "c494c3fd30d9cc8dd8098e0b072791f4f437582cb92083b6797016d5a090695a",
+        "evidence": [
+          {
+            "path": "scripts/public-source-docs/owner-release-decision-1.7.1.md",
+            "sha256": "a95d09b14f963a65fe2a07e6cd3929a85c83a10185fc7afda4538f2b94f05704"
+          }
+        ],
+        "acknowledgesUnverifiedRights": true
+      }
+    },
+    {
+      "path": "scripts/fixtures/codex-ultra-query-26.1007.9446.js",
+      "status": "unverified-proprietary-native-code",
+      "reason": "Contains exact or apparently exact native Codex implementation extracted from installed application bundles. Permission for public source redistribution is not established; dynamic local inspection is a separate issue.",
+      "sha256": "cb1c0ff2b44c446c681ceaf55342e3ec3102d75686707e671ace7af0562658f6",
+      "releaseDecision": {
+        "type": "owner-directed-publication",
+        "decisionId": "gaoge-1.7.1-2026-11-12",
+        "version": "1.7.1",
+        "sha256": "cb1c0ff2b44c446c681ceaf55342e3ec3102d75686707e671ace7af0562658f6",
+        "evidence": [
+          {
+            "path": "scripts/public-source-docs/owner-release-decision-1.7.1.md",
+            "sha256": "a95d09b14f963a65fe2a07e6cd3929a85c83a10185fc7afda4538f2b94f05704"
+          }
+        ],
+        "acknowledgesUnverifiedRights": true
+      }
+    },
+    {
+      "path": "scripts/fixtures/codex-ultra-query-26.1007.js",
+      "status": "unverified-proprietary-native-code",
+      "reason": "Contains exact or apparently exact native Codex implementation extracted from installed application bundles. Permission for public source redistribution is not established; dynamic local inspection is a separate issue.",
+      "sha256": "73ee53ec97679a497f97ea2c182dc33d5940f68e8fe37aaf46665f893dec5a98",
+      "releaseDecision": {
+        "type": "owner-directed-publication",
+        "decisionId": "gaoge-1.7.1-2026-11-12",
+        "version": "1.7.1",
+        "sha256": "73ee53ec97679a497f97ea2c182dc33d5940f68e8fe37aaf46665f893dec5a98",
+        "evidence": [
+          {
+            "path": "scripts/public-source-docs/owner-release-decision-1.7.1.md",
+            "sha256": "a95d09b14f963a65fe2a07e6cd3929a85c83a10185fc7afda4538f2b94f05704"
+          }
+        ],
+        "acknowledgesUnverifiedRights": true
+      }
+    },
+    {
+      "path": "scripts/fixtures/codex-ultra-query-26.1013.js",
+      "status": "unverified-proprietary-native-code",
+      "reason": "Contains exact or apparently exact native Codex implementation extracted from installed application bundles. Permission for public source redistribution is not established; dynamic local inspection is a separate issue.",
+      "sha256": "161ec008e27f93526137d6fb9dc6256df71bf39737fb9ca825c9d9cedec1d213",
+      "releaseDecision": {
+        "type": "owner-directed-publication",
+        "decisionId": "gaoge-1.7.1-2026-11-12",
+        "version": "1.7.1",
+        "sha256": "161ec008e27f93526137d6fb9dc6256df71bf39737fb9ca825c9d9cedec1d213",
+        "evidence": [
+          {
+            "path": "scripts/public-source-docs/owner-release-decision-1.7.1.md",
+            "sha256": "a95d09b14f963a65fe2a07e6cd3929a85c83a10185fc7afda4538f2b94f05704"
+          }
+        ],
+        "acknowledgesUnverifiedRights": true
+      }
+    },
+    {
+      "path": "scripts/fixtures/codex-ultra-query-26.1016.js",
+      "status": "unverified-proprietary-native-code",
+      "reason": "Contains exact or apparently exact native Codex implementation extracted from installed application bundles. Permission for public source redistribution is not established; dynamic local inspection is a separate issue.",
+      "sha256": "6af0be9ba3ccd52096f6854ad2a3dc4e5a56e377970a4c87b2581e64de28ea93",
+      "releaseDecision": {
+        "type": "owner-directed-publication",
+        "decisionId": "gaoge-1.7.1-2026-11-12",
+        "version": "1.7.1",
+        "sha256": "6af0be9ba3ccd52096f6854ad2a3dc4e5a56e377970a4c87b2581e64de28ea93",
+        "evidence": [
+          {
+            "path": "scripts/public-source-docs/owner-release-decision-1.7.1.md",
+            "sha256": "a95d09b14f963a65fe2a07e6cd3929a85c83a10185fc7afda4538f2b94f05704"
+          }
+        ],
+        "acknowledgesUnverifiedRights": true
+      }
+    },
+    {
+      "path": "scripts/fixtures/codex-ultra-query-26.1029.js",
+      "status": "unverified-proprietary-native-code",
+      "reason": "Contains exact or apparently exact native Codex implementation extracted from installed application bundles. Permission for public source redistribution is not established; dynamic local inspection is a separate issue.",
+      "sha256": "2cfe05071d006d665d139450f4e3994ee12157f7db81284aadd382b9417888f5",
+      "releaseDecision": {
+        "type": "owner-directed-publication",
+        "decisionId": "gaoge-1.7.1-2026-11-12",
+        "version": "1.7.1",
+        "sha256": "2cfe05071d006d665d139450f4e3994ee12157f7db81284aadd382b9417888f5",
+        "evidence": [
+          {
+            "path": "scripts/public-source-docs/owner-release-decision-1.7.1.md",
+            "sha256": "a95d09b14f963a65fe2a07e6cd3929a85c83a10185fc7afda4538f2b94f05704"
+          }
+        ],
+        "acknowledgesUnverifiedRights": true
+      }
+    },
+    {
+      "path": "scripts/fixtures/codex-ultra-query-26.1103.js",
+      "status": "unverified-proprietary-native-code",
+      "reason": "Contains exact or apparently exact native Codex implementation extracted from installed application bundles. Permission for public source redistribution is not established; dynamic local inspection is a separate issue.",
+      "sha256": "e0e306cbd1e676ebd6b6454b444d32216e06a08215081103e47b943f3f374846",
+      "releaseDecision": {
+        "type": "owner-directed-publication",
+        "decisionId": "gaoge-1.7.1-2026-11-12",
+        "version": "1.7.1",
+        "sha256": "e0e306cbd1e676ebd6b6454b444d32216e06a08215081103e47b943f3f374846",
+        "evidence": [
+          {
+            "path": "scripts/public-source-docs/owner-release-decision-1.7.1.md",
+            "sha256": "a95d09b14f963a65fe2a07e6cd3929a85c83a10185fc7afda4538f2b94f05704"
+          }
+        ],
+        "acknowledgesUnverifiedRights": true
+      }
+    },
+    {
+      "path": "src/assets/customer-logos/beike.png",
+      "status": "unverified-customer-logo-permission",
+      "reason": "Source URLs and an owner-supplied customer list are recorded, but neither establishes permission or endorsement for public redistribution.",
+      "sha256": "0d20d014262c003c10a6fb91eb0fe3c38a649584743c2bc2e8c41f4589b26bb7",
+      "releaseDecision": {
+        "type": "owner-directed-publication",
+        "decisionId": "gaoge-1.7.1-2026-11-12",
+        "version": "1.7.1",
+        "sha256": "0d20d014262c003c10a6fb91eb0fe3c38a649584743c2bc2e8c41f4589b26bb7",
+        "evidence": [
+          {
+            "path": "scripts/public-source-docs/owner-release-decision-1.7.1.md",
+            "sha256": "a95d09b14f963a65fe2a07e6cd3929a85c83a10185fc7afda4538f2b94f05704"
+          }
+        ],
+        "acknowledgesUnverifiedRights": true
+      }
+    },
+    {
+      "path": "src/assets/customer-logos/cau.png",
+      "status": "unverified-customer-logo-permission",
+      "reason": "Source URLs and an owner-supplied customer list are recorded, but neither establishes permission or endorsement for public redistribution.",
+      "sha256": "aacf769c2ef80a8b1eda410735c3cc68352bbe731a14944ce74b19fcf4bb3a31",
+      "releaseDecision": {
+        "type": "owner-directed-publication",
+        "decisionId": "gaoge-1.7.1-2026-11-12",
+        "version": "1.7.1",
+        "sha256": "aacf769c2ef80a8b1eda410735c3cc68352bbe731a14944ce74b19fcf4bb3a31",
+        "evidence": [
+          {
+            "path": "scripts/public-source-docs/owner-release-decision-1.7.1.md",
+            "sha256": "a95d09b14f963a65fe2a07e6cd3929a85c83a10185fc7afda4538f2b94f05704"
+          }
+        ],
+        "acknowledgesUnverifiedRights": true
+      }
+    },
+    {
+      "path": "src/assets/customer-logos/csu.png",
+      "status": "unverified-customer-logo-permission",
+      "reason": "Source URLs and an owner-supplied customer list are recorded, but neither establishes permission or endorsement for public redistribution.",
+      "sha256": "4265b758833d6867cef987e00919c21531456aee2d610a2a8529a574439cf829",
+      "releaseDecision": {
+        "type": "owner-directed-publication",
+        "decisionId": "gaoge-1.7.1-2026-11-12",
+        "version": "1.7.1",
+        "sha256": "4265b758833d6867cef987e00919c21531456aee2d610a2a8529a574439cf829",
+        "evidence": [
+          {
+            "path": "scripts/public-source-docs/owner-release-decision-1.7.1.md",
+            "sha256": "a95d09b14f963a65fe2a07e6cd3929a85c83a10185fc7afda4538f2b94f05704"
+          }
+        ],
+        "acknowledgesUnverifiedRights": true
+      }
+    },
+    {
+      "path": "src/assets/customer-logos/hust.png",
+      "status": "unverified-customer-logo-permission",
+      "reason": "Source URLs and an owner-supplied customer list are recorded, but neither establishes permission or endorsement for public redistribution.",
+      "sha256": "a815772c1b069aa7e920fbfdc12a094fe3415d48b5be48b7eff15591b6fd9a18",
+      "releaseDecision": {
+        "type": "owner-directed-publication",
+        "decisionId": "gaoge-1.7.1-2026-11-12",
+        "version": "1.7.1",
+        "sha256": "a815772c1b069aa7e920fbfdc12a094fe3415d48b5be48b7eff15591b6fd9a18",
+        "evidence": [
+          {
+            "path": "scripts/public-source-docs/owner-release-decision-1.7.1.md",
+            "sha256": "a95d09b14f963a65fe2a07e6cd3929a85c83a10185fc7afda4538f2b94f05704"
+          }
+        ],
+        "acknowledgesUnverifiedRights": true
+      }
+    },
+    {
+      "path": "src/assets/customer-logos/i-at.png",
+      "status": "unverified-customer-logo-permission",
+      "reason": "Source URLs and an owner-supplied customer list are recorded, but neither establishes permission or endorsement for public redistribution.",
+      "sha256": "033c1f4731f1bde1b57e4dbc3aa88f2267f5d2aebd61026986f74d0c77c52f52",
+      "releaseDecision": {
+        "type": "owner-directed-publication",
+        "decisionId": "gaoge-1.7.1-2026-11-12",
+        "version": "1.7.1",
+        "sha256": "033c1f4731f1bde1b57e4dbc3aa88f2267f5d2aebd61026986f74d0c77c52f52",
+        "evidence": [
+          {
+            "path": "scripts/public-source-docs/owner-release-decision-1.7.1.md",
+            "sha256": "a95d09b14f963a65fe2a07e6cd3929a85c83a10185fc7afda4538f2b94f05704"
+          }
+        ],
+        "acknowledgesUnverifiedRights": true
+      }
+    },
+    {
+      "path": "src/assets/customer-logos/jd-donghong.png",
+      "status": "unverified-customer-logo-permission",
+      "reason": "Source URLs and an owner-supplied customer list are recorded, but neither establishes permission or endorsement for public redistribution.",
+      "sha256": "33049c6e11eed96725ccdf9da61ccc4d6d69adfd4e86ac3ad5dc6b7117b4705c",
+      "releaseDecision": {
+        "type": "owner-directed-publication",
+        "decisionId": "gaoge-1.7.1-2026-11-12",
+        "version": "1.7.1",
+        "sha256": "33049c6e11eed96725ccdf9da61ccc4d6d69adfd4e86ac3ad5dc6b7117b4705c",
+        "evidence": [
+          {
+            "path": "scripts/public-source-docs/owner-release-decision-1.7.1.md",
+            "sha256": "a95d09b14f963a65fe2a07e6cd3929a85c83a10185fc7afda4538f2b94f05704"
+          }
+        ],
+        "acknowledgesUnverifiedRights": true
+      }
+    },
+    {
+      "path": "src/assets/customer-logos/kuaishou-dajia.png",
+      "status": "unverified-customer-logo-permission",
+      "reason": "Source URLs and an owner-supplied customer list are recorded, but neither establishes permission or endorsement for public redistribution.",
+      "sha256": "47f3cc372635e3f378c287dc8eebd2d1fa84ff12d475707b5078b6221cfe9412",
+      "releaseDecision": {
+        "type": "owner-directed-publication",
+        "decisionId": "gaoge-1.7.1-2026-11-12",
+        "version": "1.7.1",
+        "sha256": "47f3cc372635e3f378c287dc8eebd2d1fa84ff12d475707b5078b6221cfe9412",
+        "evidence": [
+          {
+            "path": "scripts/public-source-docs/owner-release-decision-1.7.1.md",
+            "sha256": "a95d09b14f963a65fe2a07e6cd3929a85c83a10185fc7afda4538f2b94f05704"
+          }
+        ],
+        "acknowledgesUnverifiedRights": true
+      }
+    },
+    {
+      "path": "src/assets/customer-logos/lzu.png",
+      "status": "unverified-customer-logo-permission",
+      "reason": "Source URLs and an owner-supplied customer list are recorded, but neither establishes permission or endorsement for public redistribution.",
+      "sha256": "d5fba42abc96272b3b0328f202c1b5fff57e2b770f9fe9c8bc9571eff792d47f",
+      "releaseDecision": {
+        "type": "owner-directed-publication",
+        "decisionId": "gaoge-1.7.1-2026-11-12",
+        "version": "1.7.1",
+        "sha256": "d5fba42abc96272b3b0328f202c1b5fff57e2b770f9fe9c8bc9571eff792d47f",
+        "evidence": [
+          {
+            "path": "scripts/public-source-docs/owner-release-decision-1.7.1.md",
+            "sha256": "a95d09b14f963a65fe2a07e6cd3929a85c83a10185fc7afda4538f2b94f05704"
+          }
+        ],
+        "acknowledgesUnverifiedRights": true
+      }
+    },
+    {
+      "path": "src/assets/customer-logos/mahua.png",
+      "status": "unverified-customer-logo-permission",
+      "reason": "Source URLs and an owner-supplied customer list are recorded, but neither establishes permission or endorsement for public redistribution.",
+      "sha256": "16e4f67a6163de598ff0beac6c13947ec275a96c6df31684e287043d369ffc51",
+      "releaseDecision": {
+        "type": "owner-directed-publication",
+        "decisionId": "gaoge-1.7.1-2026-11-12",
+        "version": "1.7.1",
+        "sha256": "16e4f67a6163de598ff0beac6c13947ec275a96c6df31684e287043d369ffc51",
+        "evidence": [
+          {
+            "path": "scripts/public-source-docs/owner-release-decision-1.7.1.md",
+            "sha256": "a95d09b14f963a65fe2a07e6cd3929a85c83a10185fc7afda4538f2b94f05704"
+          }
+        ],
+        "acknowledgesUnverifiedRights": true
+      }
+    },
+    {
+      "path": "src/assets/customer-logos/miniworld.png",
+      "status": "unverified-customer-logo-permission",
+      "reason": "Source URLs and an owner-supplied customer list are recorded, but neither establishes permission or endorsement for public redistribution.",
+      "sha256": "b0ee6ce07dac2e73168bca4f492756f37425ca8f9e68a4c3671bf9c4be0c8ccc",
+      "releaseDecision": {
+        "type": "owner-directed-publication",
+        "decisionId": "gaoge-1.7.1-2026-11-12",
+        "version": "1.7.1",
+        "sha256": "b0ee6ce07dac2e73168bca4f492756f37425ca8f9e68a4c3671bf9c4be0c8ccc",
+        "evidence": [
+          {
+            "path": "scripts/public-source-docs/owner-release-decision-1.7.1.md",
+            "sha256": "a95d09b14f963a65fe2a07e6cd3929a85c83a10185fc7afda4538f2b94f05704"
+          }
+        ],
+        "acknowledgesUnverifiedRights": true
+      }
+    },
+    {
+      "path": "src/assets/customer-logos/modern-express.png",
+      "status": "unverified-customer-logo-permission",
+      "reason": "Source URLs and an owner-supplied customer list are recorded, but neither establishes permission or endorsement for public redistribution.",
+      "sha256": "11e2fe9eed784d7791d1993979b2a9dc700b72896430af62617f19c2b4f45ba0",
+      "releaseDecision": {
+        "type": "owner-directed-publication",
+        "decisionId": "gaoge-1.7.1-2026-11-12",
+        "version": "1.7.1",
+        "sha256": "11e2fe9eed784d7791d1993979b2a9dc700b72896430af62617f19c2b4f45ba0",
+        "evidence": [
+          {
+            "path": "scripts/public-source-docs/owner-release-decision-1.7.1.md",
+            "sha256": "a95d09b14f963a65fe2a07e6cd3929a85c83a10185fc7afda4538f2b94f05704"
+          }
+        ],
+        "acknowledgesUnverifiedRights": true
+      }
+    },
+    {
+      "path": "src/assets/customer-logos/nudt.png",
+      "status": "unverified-customer-logo-permission",
+      "reason": "Source URLs and an owner-supplied customer list are recorded, but neither establishes permission or endorsement for public redistribution.",
+      "sha256": "0aa6cad1237ebb64cf8dc10577e145cde765d96ef478ca08527a92f53b721659",
+      "releaseDecision": {
+        "type": "owner-directed-publication",
+        "decisionId": "gaoge-1.7.1-2026-11-12",
+        "version": "1.7.1",
+        "sha256": "0aa6cad1237ebb64cf8dc10577e145cde765d96ef478ca08527a92f53b721659",
+        "evidence": [
+          {
+            "path": "scripts/public-source-docs/owner-release-decision-1.7.1.md",
+            "sha256": "a95d09b14f963a65fe2a07e6cd3929a85c83a10185fc7afda4538f2b94f05704"
+          }
+        ],
+        "acknowledgesUnverifiedRights": true
+      }
+    },
+    {
+      "path": "src/assets/customer-logos/supermap.png",
+      "status": "unverified-customer-logo-permission",
+      "reason": "Source URLs and an owner-supplied customer list are recorded, but neither establishes permission or endorsement for public redistribution.",
+      "sha256": "f936bd56b4b830eb100c6d567a6bd04414a73f06e12208950e38bc2fe14fd708",
+      "releaseDecision": {
+        "type": "owner-directed-publication",
+        "decisionId": "gaoge-1.7.1-2026-11-12",
+        "version": "1.7.1",
+        "sha256": "f936bd56b4b830eb100c6d567a6bd04414a73f06e12208950e38bc2fe14fd708",
+        "evidence": [
+          {
+            "path": "scripts/public-source-docs/owner-release-decision-1.7.1.md",
+            "sha256": "a95d09b14f963a65fe2a07e6cd3929a85c83a10185fc7afda4538f2b94f05704"
+          }
+        ],
+        "acknowledgesUnverifiedRights": true
+      }
+    },
+    {
+      "path": "src/assets/customer-logos/sysu.png",
+      "status": "unverified-customer-logo-permission",
+      "reason": "Source URLs and an owner-supplied customer list are recorded, but neither establishes permission or endorsement for public redistribution.",
+      "sha256": "f2d89651cff36b3f85a3be31fbba5f323af9cbc34226e50260d7c854d83eabf1",
+      "releaseDecision": {
+        "type": "owner-directed-publication",
+        "decisionId": "gaoge-1.7.1-2026-11-12",
+        "version": "1.7.1",
+        "sha256": "f2d89651cff36b3f85a3be31fbba5f323af9cbc34226e50260d7c854d83eabf1",
+        "evidence": [
+          {
+            "path": "scripts/public-source-docs/owner-release-decision-1.7.1.md",
+            "sha256": "a95d09b14f963a65fe2a07e6cd3929a85c83a10185fc7afda4538f2b94f05704"
+          }
+        ],
+        "acknowledgesUnverifiedRights": true
+      }
+    },
+    {
+      "path": "src/assets/customer-logos/szu.png",
+      "status": "unverified-customer-logo-permission",
+      "reason": "Source URLs and an owner-supplied customer list are recorded, but neither establishes permission or endorsement for public redistribution.",
+      "sha256": "7ce8a0fa422d867c6307fa019d96c60231c9909b1928852e35953c1c21098f78",
+      "releaseDecision": {
+        "type": "owner-directed-publication",
+        "decisionId": "gaoge-1.7.1-2026-11-12",
+        "version": "1.7.1",
+        "sha256": "7ce8a0fa422d867c6307fa019d96c60231c9909b1928852e35953c1c21098f78",
+        "evidence": [
+          {
+            "path": "scripts/public-source-docs/owner-release-decision-1.7.1.md",
+            "sha256": "a95d09b14f963a65fe2a07e6cd3929a85c83a10185fc7afda4538f2b94f05704"
+          }
+        ],
+        "acknowledgesUnverifiedRights": true
+      }
+    },
+    {
+      "path": "src/assets/customer-logos/tongji.png",
+      "status": "unverified-customer-logo-permission",
+      "reason": "Source URLs and an owner-supplied customer list are recorded, but neither establishes permission or endorsement for public redistribution.",
+      "sha256": "9b1dc6ad970bca74e5e60c65896ab2a947db1902652205406180d00e706cc144",
+      "releaseDecision": {
+        "type": "owner-directed-publication",
+        "decisionId": "gaoge-1.7.1-2026-11-12",
+        "version": "1.7.1",
+        "sha256": "9b1dc6ad970bca74e5e60c65896ab2a947db1902652205406180d00e706cc144",
+        "evidence": [
+          {
+            "path": "scripts/public-source-docs/owner-release-decision-1.7.1.md",
+            "sha256": "a95d09b14f963a65fe2a07e6cd3929a85c83a10185fc7afda4538f2b94f05704"
+          }
+        ],
+        "acknowledgesUnverifiedRights": true
+      }
+    },
+    {
+      "path": "src/assets/customer-logos/tsinghua.png",
+      "status": "unverified-customer-logo-permission",
+      "reason": "Source URLs and an owner-supplied customer list are recorded, but neither establishes permission or endorsement for public redistribution.",
+      "sha256": "22f8bae24a292359ad7b7bc0388cad32bfd85a96986c8261944d98ccdcd903c0",
+      "releaseDecision": {
+        "type": "owner-directed-publication",
+        "decisionId": "gaoge-1.7.1-2026-11-12",
+        "version": "1.7.1",
+        "sha256": "22f8bae24a292359ad7b7bc0388cad32bfd85a96986c8261944d98ccdcd903c0",
+        "evidence": [
+          {
+            "path": "scripts/public-source-docs/owner-release-decision-1.7.1.md",
+            "sha256": "a95d09b14f963a65fe2a07e6cd3929a85c83a10185fc7afda4538f2b94f05704"
+          }
+        ],
+        "acknowledgesUnverifiedRights": true
+      }
+    },
+    {
+      "path": "src/assets/customer-logos/westlake.png",
+      "status": "unverified-customer-logo-permission",
+      "reason": "Source URLs and an owner-supplied customer list are recorded, but neither establishes permission or endorsement for public redistribution.",
+      "sha256": "075b4ec30bd6018af73742552945cfb7c8c513a68dfe5cf21f986d7cdf8bee96",
+      "releaseDecision": {
+        "type": "owner-directed-publication",
+        "decisionId": "gaoge-1.7.1-2026-11-12",
+        "version": "1.7.1",
+        "sha256": "075b4ec30bd6018af73742552945cfb7c8c513a68dfe5cf21f986d7cdf8bee96",
+        "evidence": [
+          {
+            "path": "scripts/public-source-docs/owner-release-decision-1.7.1.md",
+            "sha256": "a95d09b14f963a65fe2a07e6cd3929a85c83a10185fc7afda4538f2b94f05704"
+          }
+        ],
+        "acknowledgesUnverifiedRights": true
+      }
+    },
+    {
+      "path": "src/assets/customer-logos/zjnu.png",
+      "status": "unverified-customer-logo-permission",
+      "reason": "Source URLs and an owner-supplied customer list are recorded, but neither establishes permission or endorsement for public redistribution.",
+      "sha256": "ef6ce3cbdc4065fdebb813779e602aaa10254f484b858e2abdd9938b29500397",
+      "releaseDecision": {
+        "type": "owner-directed-publication",
+        "decisionId": "gaoge-1.7.1-2026-11-12",
+        "version": "1.7.1",
+        "sha256": "ef6ce3cbdc4065fdebb813779e602aaa10254f484b858e2abdd9938b29500397",
+        "evidence": [
+          {
+            "path": "scripts/public-source-docs/owner-release-decision-1.7.1.md",
+            "sha256": "a95d09b14f963a65fe2a07e6cd3929a85c83a10185fc7afda4538f2b94f05704"
+          }
+        ],
+        "acknowledgesUnverifiedRights": true
+      }
+    },
+    {
+      "path": "src/assets/customer-logos/zuel.png",
+      "status": "unverified-customer-logo-permission",
+      "reason": "Source URLs and an owner-supplied customer list are recorded, but neither establishes permission or endorsement for public redistribution.",
+      "sha256": "f1485aab2b23a7b0a8181c1b2c46169bdbe284b934c840a896f73faf62b96ce9",
+      "releaseDecision": {
+        "type": "owner-directed-publication",
+        "decisionId": "gaoge-1.7.1-2026-11-12",
+        "version": "1.7.1",
+        "sha256": "f1485aab2b23a7b0a8181c1b2c46169bdbe284b934c840a896f73faf62b96ce9",
+        "evidence": [
+          {
+            "path": "scripts/public-source-docs/owner-release-decision-1.7.1.md",
+            "sha256": "a95d09b14f963a65fe2a07e6cd3929a85c83a10185fc7afda4538f2b94f05704"
+          }
+        ],
+        "acknowledgesUnverifiedRights": true
+      }
+    },
+    {
+      "path": "src/assets/provider-logos/claude.svg",
+      "status": "provider-logo-review-pending",
+      "reason": "Provider-identification SVG is used in the UI; retained use is not automatically an AGPL grant. Check the source asset license and trademark-use conditions before public distribution.",
+      "sha256": "a67e829a1f62a1e1024fc75718aa49056f540c29e0a88a9949ccca8cd4745b16",
+      "releaseDecision": {
+        "type": "owner-directed-publication",
+        "decisionId": "gaoge-1.7.1-2026-11-12",
+        "version": "1.7.1",
+        "sha256": "a67e829a1f62a1e1024fc75718aa49056f540c29e0a88a9949ccca8cd4745b16",
+        "evidence": [
+          {
+            "path": "scripts/public-source-docs/owner-release-decision-1.7.1.md",
+            "sha256": "a95d09b14f963a65fe2a07e6cd3929a85c83a10185fc7afda4538f2b94f05704"
+          }
+        ],
+        "acknowledgesUnverifiedRights": true
+      }
+    },
+    {
+      "path": "src/assets/provider-logos/deepseek.svg",
+      "status": "provider-logo-review-pending",
+      "reason": "Provider-identification SVG is used in the UI; retained use is not automatically an AGPL grant. Check the source asset license and trademark-use conditions before public distribution.",
+      "sha256": "340240628ba95b147e252be0386fd801f8f3a35f14c411633767f4aa9c45c1d4",
+      "releaseDecision": {
+        "type": "owner-directed-publication",
+        "decisionId": "gaoge-1.7.1-2026-11-12",
+        "version": "1.7.1",
+        "sha256": "340240628ba95b147e252be0386fd801f8f3a35f14c411633767f4aa9c45c1d4",
+        "evidence": [
+          {
+            "path": "scripts/public-source-docs/owner-release-decision-1.7.1.md",
+            "sha256": "a95d09b14f963a65fe2a07e6cd3929a85c83a10185fc7afda4538f2b94f05704"
+          }
+        ],
+        "acknowledgesUnverifiedRights": true
+      }
+    },
+    {
+      "path": "src/assets/provider-logos/glm.svg",
+      "status": "provider-logo-review-pending",
+      "reason": "Provider-identification SVG is used in the UI; retained use is not automatically an AGPL grant. Check the source asset license and trademark-use conditions before public distribution.",
+      "sha256": "b145d40f8373637ed4c32c425265b721a4b8b27067480a1596d60a09ea30302b",
+      "releaseDecision": {
+        "type": "owner-directed-publication",
+        "decisionId": "gaoge-1.7.1-2026-11-12",
+        "version": "1.7.1",
+        "sha256": "b145d40f8373637ed4c32c425265b721a4b8b27067480a1596d60a09ea30302b",
+        "evidence": [
+          {
+            "path": "scripts/public-source-docs/owner-release-decision-1.7.1.md",
+            "sha256": "a95d09b14f963a65fe2a07e6cd3929a85c83a10185fc7afda4538f2b94f05704"
+          }
+        ],
+        "acknowledgesUnverifiedRights": true
+      }
+    },
+    {
+      "path": "src/assets/provider-logos/grok.svg",
+      "status": "provider-logo-review-pending",
+      "reason": "Provider-identification SVG is used in the UI; retained use is not automatically an AGPL grant. Check the source asset license and trademark-use conditions before public distribution.",
+      "sha256": "fb9179372a0d7a2b03c2bd701343dcf6c82d90189f43accc5f8d69805e6f5993",
+      "releaseDecision": {
+        "type": "owner-directed-publication",
+        "decisionId": "gaoge-1.7.1-2026-11-12",
+        "version": "1.7.1",
+        "sha256": "fb9179372a0d7a2b03c2bd701343dcf6c82d90189f43accc5f8d69805e6f5993",
+        "evidence": [
+          {
+            "path": "scripts/public-source-docs/owner-release-decision-1.7.1.md",
+            "sha256": "a95d09b14f963a65fe2a07e6cd3929a85c83a10185fc7afda4538f2b94f05704"
+          }
+        ],
+        "acknowledgesUnverifiedRights": true
+      }
+    },
+    {
+      "path": "src/assets/provider-logos/kimi.svg",
+      "status": "provider-logo-review-pending",
+      "reason": "Provider-identification SVG is used in the UI; retained use is not automatically an AGPL grant. Check the source asset license and trademark-use conditions before public distribution.",
+      "sha256": "89264832e891d42ed8aa05f8a8c60908af2f909e158105692aeb463ccbd65073",
+      "releaseDecision": {
+        "type": "owner-directed-publication",
+        "decisionId": "gaoge-1.7.1-2026-11-12",
+        "version": "1.7.1",
+        "sha256": "89264832e891d42ed8aa05f8a8c60908af2f909e158105692aeb463ccbd65073",
+        "evidence": [
+          {
+            "path": "scripts/public-source-docs/owner-release-decision-1.7.1.md",
+            "sha256": "a95d09b14f963a65fe2a07e6cd3929a85c83a10185fc7afda4538f2b94f05704"
+          }
+        ],
+        "acknowledgesUnverifiedRights": true
+      }
+    },
+    {
+      "path": "src/assets/provider-logos/openai.svg",
+      "status": "provider-logo-review-pending",
+      "reason": "Provider-identification SVG is used in the UI; retained use is not automatically an AGPL grant. Check the source asset license and trademark-use conditions before public distribution.",
+      "sha256": "54f14ccd805a266f6e97fa23361235b4e928043fd1c399060564027ab50ba132",
+      "releaseDecision": {
+        "type": "owner-directed-publication",
+        "decisionId": "gaoge-1.7.1-2026-11-12",
+        "version": "1.7.1",
+        "sha256": "54f14ccd805a266f6e97fa23361235b4e928043fd1c399060564027ab50ba132",
+        "evidence": [
+          {
+            "path": "scripts/public-source-docs/owner-release-decision-1.7.1.md",
+            "sha256": "a95d09b14f963a65fe2a07e6cd3929a85c83a10185fc7afda4538f2b94f05704"
+          }
+        ],
+        "acknowledgesUnverifiedRights": true
+      }
+    },
+    {
+      "path": "theme-resources/sources/dalao-dianyan.webp",
+      "status": "unverified-third-party-artwork",
+      "reason": "Retained upstream software MIT notice explicitly does not clear picture/character rights; provenance reports missing or unverified rights evidence.",
+      "sha256": "489390d9ad49c303438187735e827620778b4e84cb036a8d884d1792ab3ec33e",
+      "releaseDecision": {
+        "type": "owner-directed-publication",
+        "decisionId": "gaoge-1.7.1-2026-11-12",
+        "version": "1.7.1",
+        "sha256": "489390d9ad49c303438187735e827620778b4e84cb036a8d884d1792ab3ec33e",
+        "evidence": [
+          {
+            "path": "scripts/public-source-docs/owner-release-decision-1.7.1.md",
+            "sha256": "a95d09b14f963a65fe2a07e6cd3929a85c83a10185fc7afda4538f2b94f05704"
+          }
+        ],
+        "acknowledgesUnverifiedRights": true
+      }
+    },
+    {
+      "path": "theme-resources/sources/deepspace-dawn.webp",
+      "status": "unverified-third-party-artwork",
+      "reason": "Retained upstream software MIT notice explicitly does not clear picture/character rights; provenance reports missing or unverified rights evidence.",
+      "sha256": "8d0b6d47bcbc6d39ecc91a897742b211fa58be8b0b9f8334c612dbeb8026089e",
+      "releaseDecision": {
+        "type": "owner-directed-publication",
+        "decisionId": "gaoge-1.7.1-2026-11-12",
+        "version": "1.7.1",
+        "sha256": "8d0b6d47bcbc6d39ecc91a897742b211fa58be8b0b9f8334c612dbeb8026089e",
+        "evidence": [
+          {
+            "path": "scripts/public-source-docs/owner-release-decision-1.7.1.md",
+            "sha256": "a95d09b14f963a65fe2a07e6cd3929a85c83a10185fc7afda4538f2b94f05704"
+          }
+        ],
+        "acknowledgesUnverifiedRights": true
+      }
+    },
+    {
+      "path": "theme-resources/sources/deepspace-star.webp",
+      "status": "unverified-third-party-artwork",
+      "reason": "Retained upstream software MIT notice explicitly does not clear picture/character rights; provenance reports missing or unverified rights evidence.",
+      "sha256": "f54f01c3190e0a40984de0d16913681870f2f457fd3f8a0a4c998a89a2928fc0",
+      "releaseDecision": {
+        "type": "owner-directed-publication",
+        "decisionId": "gaoge-1.7.1-2026-11-12",
+        "version": "1.7.1",
+        "sha256": "f54f01c3190e0a40984de0d16913681870f2f457fd3f8a0a4c998a89a2928fc0",
+        "evidence": [
+          {
+            "path": "scripts/public-source-docs/owner-release-decision-1.7.1.md",
+            "sha256": "a95d09b14f963a65fe2a07e6cd3929a85c83a10185fc7afda4538f2b94f05704"
+          }
+        ],
+        "acknowledgesUnverifiedRights": true
+      }
+    },
+    {
+      "path": "theme-resources/sources/dragonball-super-saiyan.webp",
+      "status": "unverified-third-party-artwork",
+      "reason": "Retained upstream software MIT notice explicitly does not clear picture/character rights; provenance reports missing or unverified rights evidence.",
+      "sha256": "9b05d1b74abc7936ed2d4f5b80f1aa9f284dd0e5dd7817c2ce7d7a1e52ea473e",
+      "releaseDecision": {
+        "type": "owner-directed-publication",
+        "decisionId": "gaoge-1.7.1-2026-11-12",
+        "version": "1.7.1",
+        "sha256": "9b05d1b74abc7936ed2d4f5b80f1aa9f284dd0e5dd7817c2ce7d7a1e52ea473e",
+        "evidence": [
+          {
+            "path": "scripts/public-source-docs/owner-release-decision-1.7.1.md",
+            "sha256": "a95d09b14f963a65fe2a07e6cd3929a85c83a10185fc7afda4538f2b94f05704"
+          }
+        ],
+        "acknowledgesUnverifiedRights": true
+      }
+    },
+    {
+      "path": "theme-resources/sources/gaoge-preview-sheet.jpg",
+      "status": "declared-original-art-review-pending",
+      "reason": "Theme catalog declares Gaoge original artwork. Preserve this declaration, but record the original author/source and owner authorization before marking the exact asset cleared.",
+      "sha256": "2835bb2ccf5344c07b5088dae33eb7ca90a5392a53d51450c5a822826d94a3ae",
+      "releaseDecision": {
+        "type": "owner-directed-publication",
+        "decisionId": "gaoge-1.7.1-2026-11-12",
+        "version": "1.7.1",
+        "sha256": "2835bb2ccf5344c07b5088dae33eb7ca90a5392a53d51450c5a822826d94a3ae",
+        "evidence": [
+          {
+            "path": "scripts/public-source-docs/owner-release-decision-1.7.1.md",
+            "sha256": "a95d09b14f963a65fe2a07e6cd3929a85c83a10185fc7afda4538f2b94f05704"
+          }
+        ],
+        "acknowledgesUnverifiedRights": true
+      }
+    },
+    {
+      "path": "theme-resources/sources/genshin-dawn.webp",
+      "status": "unverified-third-party-artwork",
+      "reason": "Retained upstream software MIT notice explicitly does not clear picture/character rights; provenance reports missing or unverified rights evidence.",
+      "sha256": "75f0ceb98028492d88bdeca77da955a1b9d06d09b2dddb0cc3a5301c91621773",
+      "releaseDecision": {
+        "type": "owner-directed-publication",
+        "decisionId": "gaoge-1.7.1-2026-11-12",
+        "version": "1.7.1",
+        "sha256": "75f0ceb98028492d88bdeca77da955a1b9d06d09b2dddb0cc3a5301c91621773",
+        "evidence": [
+          {
+            "path": "scripts/public-source-docs/owner-release-decision-1.7.1.md",
+            "sha256": "a95d09b14f963a65fe2a07e6cd3929a85c83a10185fc7afda4538f2b94f05704"
+          }
+        ],
+        "acknowledgesUnverifiedRights": true
+      }
+    },
+    {
+      "path": "theme-resources/sources/qq-2007-deep.svg",
+      "status": "qq-artwork-rights-review-required",
+      "reason": "QQ-related preview/artwork is separate from the MIT structural CSS. Existing notice requires an independent image/character/trademark rights review, not blanket relicensing.",
+      "sha256": "08a94088f743c5567068af8d6419349e9e5200dc95769562d444e818e7bec9ab",
+      "releaseDecision": {
+        "type": "owner-directed-publication",
+        "decisionId": "gaoge-1.7.1-2026-11-12",
+        "version": "1.7.1",
+        "sha256": "08a94088f743c5567068af8d6419349e9e5200dc95769562d444e818e7bec9ab",
+        "evidence": [
+          {
+            "path": "scripts/public-source-docs/owner-release-decision-1.7.1.md",
+            "sha256": "a95d09b14f963a65fe2a07e6cd3929a85c83a10185fc7afda4538f2b94f05704"
+          }
+        ],
+        "acknowledgesUnverifiedRights": true
+      }
+    },
+    {
+      "path": "theme-resources/sources/qq-retro.png",
+      "status": "qq-artwork-rights-review-required",
+      "reason": "QQ-related preview/artwork is separate from the MIT structural CSS. Existing notice requires an independent image/character/trademark rights review, not blanket relicensing.",
+      "sha256": "31bde93bb02d6723e0b6aa0ead675577604120acb0a6799163dd37f5cdd0a08e",
+      "releaseDecision": {
+        "type": "owner-directed-publication",
+        "decisionId": "gaoge-1.7.1-2026-11-12",
+        "version": "1.7.1",
+        "sha256": "31bde93bb02d6723e0b6aa0ead675577604120acb0a6799163dd37f5cdd0a08e",
+        "evidence": [
+          {
+            "path": "scripts/public-source-docs/owner-release-decision-1.7.1.md",
+            "sha256": "a95d09b14f963a65fe2a07e6cd3929a85c83a10185fc7afda4538f2b94f05704"
+          }
+        ],
+        "acknowledgesUnverifiedRights": true
+      }
+    },
+    {
+      "path": "theme-resources/sources/wuthering-echo.webp",
+      "status": "unverified-third-party-artwork",
+      "reason": "Retained upstream software MIT notice explicitly does not clear picture/character rights; provenance reports missing or unverified rights evidence.",
+      "sha256": "d85fabf57ce3ceed3e3f8279898136469b65495c4379f9f471402d3c9541beed",
+      "releaseDecision": {
+        "type": "owner-directed-publication",
+        "decisionId": "gaoge-1.7.1-2026-11-12",
+        "version": "1.7.1",
+        "sha256": "d85fabf57ce3ceed3e3f8279898136469b65495c4379f9f471402d3c9541beed",
+        "evidence": [
+          {
+            "path": "scripts/public-source-docs/owner-release-decision-1.7.1.md",
+            "sha256": "a95d09b14f963a65fe2a07e6cd3929a85c83a10185fc7afda4538f2b94f05704"
+          }
+        ],
+        "acknowledgesUnverifiedRights": true
+      }
+    },
+    {
+      "path": "theme-resources/vendor/codex-qq-2007-assets/assistant.png",
+      "status": "qq-artwork-rights-review-required",
+      "reason": "QQ-related preview/artwork is separate from the MIT structural CSS. Existing notice requires an independent image/character/trademark rights review, not blanket relicensing.",
+      "sha256": "080718881233301fb93e3b52cbcda7a62ab21159beacd4ac46fc59a048443f13",
+      "releaseDecision": {
+        "type": "owner-directed-publication",
+        "decisionId": "gaoge-1.7.1-2026-11-12",
+        "version": "1.7.1",
+        "sha256": "080718881233301fb93e3b52cbcda7a62ab21159beacd4ac46fc59a048443f13",
+        "evidence": [
+          {
+            "path": "scripts/public-source-docs/owner-release-decision-1.7.1.md",
+            "sha256": "a95d09b14f963a65fe2a07e6cd3929a85c83a10185fc7afda4538f2b94f05704"
+          }
+        ],
+        "acknowledgesUnverifiedRights": true
+      }
+    },
+    {
+      "path": "theme-resources/vendor/codex-qq-2007-assets/qq-show.png",
+      "status": "qq-artwork-rights-review-required",
+      "reason": "QQ-related preview/artwork is separate from the MIT structural CSS. Existing notice requires an independent image/character/trademark rights review, not blanket relicensing.",
+      "sha256": "c6a7530cf8410c85c664ea94a7809a1bab885da47d74429afc70ece235da9681",
+      "releaseDecision": {
+        "type": "owner-directed-publication",
+        "decisionId": "gaoge-1.7.1-2026-11-12",
+        "version": "1.7.1",
+        "sha256": "c6a7530cf8410c85c664ea94a7809a1bab885da47d74429afc70ece235da9681",
+        "evidence": [
+          {
+            "path": "scripts/public-source-docs/owner-release-decision-1.7.1.md",
+            "sha256": "a95d09b14f963a65fe2a07e6cd3929a85c83a10185fc7afda4538f2b94f05704"
+          }
+        ],
+        "acknowledgesUnverifiedRights": true
+      }
+    },
+    {
+      "path": "theme-resources/vendor/codex-qq-2007-assets/qq2007-icons.png",
+      "status": "qq-artwork-rights-review-required",
+      "reason": "QQ-related preview/artwork is separate from the MIT structural CSS. Existing notice requires an independent image/character/trademark rights review, not blanket relicensing.",
+      "sha256": "1ec9533230a8ac61a2a4b0dd13d869b590a1c2b590e33bd3821f7daf21c9c19b",
+      "releaseDecision": {
+        "type": "owner-directed-publication",
+        "decisionId": "gaoge-1.7.1-2026-11-12",
+        "version": "1.7.1",
+        "sha256": "1ec9533230a8ac61a2a4b0dd13d869b590a1c2b590e33bd3821f7daf21c9c19b",
+        "evidence": [
+          {
+            "path": "scripts/public-source-docs/owner-release-decision-1.7.1.md",
+            "sha256": "a95d09b14f963a65fe2a07e6cd3929a85c83a10185fc7afda4538f2b94f05704"
+          }
+        ],
+        "acknowledgesUnverifiedRights": true
+      }
+    }
+  ],
+  "filesDigest": "5e1ad110d0f98bad2ae86ba5f99b6e8207dfed20b05e6835a92c4299c41a9d9d"
+}
