@@ -9,7 +9,10 @@ param(
   [switch] $KeepBuildPrivate = $true,
 
   [ValidatePattern('^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$')]
-  [string] $PublicSourceRepository = "KKK-898/Gaoge-Free-Desktop"
+  [string] $PublicSourceRepository = "KKK-898/Gaoge-Free-Desktop",
+
+  [ValidateNotNullOrEmpty()]
+  [string] $ReleaseTag = "v$Version"
 )
 
 $ErrorActionPreference = "Stop"
@@ -188,6 +191,13 @@ function Assert-VersionOrder {
   if ($minimum -gt $release) { throw "MinimumVersion $MinimumVersion cannot be newer than Version $Version." }
 }
 
+function Assert-ReleaseTag {
+  $pattern = '\Av' + [regex]::Escape($Version) + '(?:-build\.[1-9][0-9]*)?\z'
+  if (-not [regex]::IsMatch($ReleaseTag, $pattern)) {
+    throw "ReleaseTag must be v$Version or v$Version-build.N, where N is a positive integer."
+  }
+}
+
 function Assert-SourceVersionMatches {
   Write-Step "Checking immutable release version $Version"
   $package = Get-Content -Raw -LiteralPath (Join-Path $script:Root "package.json") | ConvertFrom-Json
@@ -292,8 +302,8 @@ function Confirm-PublicSourceRelease {
     throw "No reviewed corresponding-source directory has been prepared."
   }
   $verified = ConvertFrom-Json (Invoke-Captured node (Join-Path $script:Root "scripts/verify-public-source.mjs") `
-    --repository $PublicSourceRepository --tag "v$Version" --source-directory $script:PublicSourceDirectory)
-  if ($verified.verified -ne $true -or $verified.version -ne $Version) {
+    --repository $PublicSourceRepository --tag $ReleaseTag --source-directory $script:PublicSourceDirectory)
+  if ($verified.verified -ne $true -or $verified.version -ne $Version -or $verified.tag -cne $ReleaseTag) {
     throw "Public corresponding source verification failed."
   }
   if ($null -ne $script:PublicSourceVerification -and
@@ -301,7 +311,7 @@ function Confirm-PublicSourceRelease {
     throw "The public source tag changed during release."
   }
   $script:PublicSourceVerification = $verified
-  Write-Info "verified public source: $PublicSourceRepository @ $($verified.publicCommit)"
+  Write-Info "verified public source: $PublicSourceRepository @ $ReleaseTag ($($verified.publicCommit))"
 }
 
 function Assert-BuildMatchesPublicSource([string] $BuildSha) {
@@ -353,7 +363,7 @@ function Export-BuildSnapshot([string] $TagName, [string] $BuildBranch) {
     Invoke-Checked git config user.email "release-bot@gaogeai.cloud"
     Invoke-Checked git checkout -b $BuildBranch
     Invoke-Checked git add .
-    Invoke-Checked git commit -m "release: build snapshot $Version"
+    Invoke-Checked git commit -m "release: build snapshot $TagName"
     Invoke-Checked git remote add origin "https://github.com/$($script:BuildRepo).git"
     Invoke-Checked git push --force origin "$BuildBranch`:$BuildBranch"
     Invoke-Checked git tag $TagName
@@ -367,40 +377,40 @@ function Export-BuildSnapshot([string] $TagName, [string] $BuildBranch) {
 function Find-Or-RunWorkflow([string] $BuildSha, [string] $TagName) {
   $runs = @()
   try {
-    $parsedRuns = ConvertFrom-Json (Invoke-Captured gh run list --repo $script:BuildRepo --workflow release-build.yml --limit 30 --json 'databaseId,headSha,headBranch,status,conclusion,url,createdAt')
+    $parsedRuns = ConvertFrom-Json (Invoke-Captured gh run list --repo $script:BuildRepo --workflow release-build.yml --branch $TagName --limit 30 --json 'databaseId,headSha,headBranch,status,conclusion,url,createdAt')
     foreach ($parsedRun in $parsedRuns) { $runs += $parsedRun }
   } catch { $runs = @() }
-  $existing = $runs | Where-Object { $_.headSha -eq $BuildSha -and $_.conclusion -eq "success" } | Select-Object -First 1
+  $existing = $runs | Where-Object { $_.headSha -eq $BuildSha -and $_.headBranch -ceq $TagName -and $_.conclusion -eq "success" } | Select-Object -First 1
   if ($null -ne $existing) {
     Write-Info "reusing successful build run $($existing.url)"
     return $existing
   }
-  $active = $runs | Where-Object { $_.headSha -eq $BuildSha -and $_.status -ne "completed" } | Select-Object -First 1
+  $active = $runs | Where-Object { $_.headSha -eq $BuildSha -and $_.headBranch -ceq $TagName -and $_.status -ne "completed" } | Select-Object -First 1
   if ($null -ne $active) {
     Write-Info "waiting for existing build run $($active.url)"
     Invoke-Checked gh run watch ([string]$active.databaseId) --repo $script:BuildRepo --exit-status
-    $completedActive = ConvertFrom-Json (Invoke-Captured gh run view ([string]$active.databaseId) --repo $script:BuildRepo --json 'databaseId,headSha,status,conclusion,url')
-    if ($completedActive.headSha -ne $BuildSha -or $completedActive.conclusion -ne "success") {
+    $completedActive = ConvertFrom-Json (Invoke-Captured gh run view ([string]$active.databaseId) --repo $script:BuildRepo --json 'databaseId,headSha,headBranch,status,conclusion,url')
+    if ($completedActive.headSha -ne $BuildSha -or $completedActive.headBranch -cne $TagName -or $completedActive.conclusion -ne "success") {
       throw "Existing Release Build did not complete successfully for the expected snapshot."
     }
     return $completedActive
   }
 
-  Write-Step "Starting three-platform build"
+  Write-Step "Starting three-platform build for $TagName"
   Invoke-Checked gh workflow run release-build.yml --repo $script:BuildRepo --ref $TagName
   $run = $null
   for ($attempt = 0; $attempt -lt 30 -and $null -eq $run; $attempt += 1) {
     Start-Sleep -Seconds 2
     $runs = @()
-    $parsedRuns = ConvertFrom-Json (Invoke-Captured gh run list --repo $script:BuildRepo --workflow release-build.yml --limit 30 --json 'databaseId,headSha,headBranch,status,conclusion,url,createdAt')
+    $parsedRuns = ConvertFrom-Json (Invoke-Captured gh run list --repo $script:BuildRepo --workflow release-build.yml --branch $TagName --limit 30 --json 'databaseId,headSha,headBranch,status,conclusion,url,createdAt')
     foreach ($parsedRun in $parsedRuns) { $runs += $parsedRun }
-    $run = $runs | Where-Object { $_.headSha -eq $BuildSha } | Select-Object -First 1
+    $run = $runs | Where-Object { $_.headSha -eq $BuildSha -and $_.headBranch -ceq $TagName } | Select-Object -First 1
   }
   if ($null -eq $run) { throw "Could not find Release Build run for $BuildSha" }
   Write-Info "workflow run: $($run.url)"
   Invoke-Checked gh run watch ([string]$run.databaseId) --repo $script:BuildRepo --exit-status
-  $completed = ConvertFrom-Json (Invoke-Captured gh run view ([string]$run.databaseId) --repo $script:BuildRepo --json 'databaseId,headSha,status,conclusion,url')
-  if ($completed.headSha -ne $BuildSha -or $completed.conclusion -ne "success") {
+  $completed = ConvertFrom-Json (Invoke-Captured gh run view ([string]$run.databaseId) --repo $script:BuildRepo --json 'databaseId,headSha,headBranch,status,conclusion,url')
+  if ($completed.headSha -ne $BuildSha -or $completed.headBranch -cne $TagName -or $completed.conclusion -ne "success") {
     throw "Release Build did not complete successfully for the expected snapshot."
   }
   return $completed
@@ -602,11 +612,13 @@ trap {
 
 Set-Location $script:Root
 Assert-VersionOrder
+Assert-ReleaseTag
+Write-Info "release version: $Version; immutable tag: $ReleaseTag"
 $config = Read-ReleaseConfig
 $script:BuildRepo = [string]$config.buildRepo
 $sourceBranch = [string](Get-Property $config "sourceBranch" "main")
 $buildBranch = [string](Get-Property $config "buildBranch" "master")
-$tagName = "v$Version"
+$tagName = $ReleaseTag
 
 foreach ($command in @("git", "gh", "node", "npm", "cargo", "ssh", "scp", "python")) { Require-Command $command }
 

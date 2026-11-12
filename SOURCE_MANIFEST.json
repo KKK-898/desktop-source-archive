@@ -1,9 +1,14 @@
 {
   "schemaVersion": 1,
   "version": "1.7.1",
-  "sourceCommit": "5e7c48e6999e8d3116239b5fa043837a6d08229a",
-  "sourceTree": "51e331f7a2fc224edf93ad2e581c6c104a5eae34",
+  "sourceCommit": "1891afd2af855f2bdbc537804afbd0b418e3472c",
+  "sourceTree": "3cc994f1f4b748cf74b244682464955c6f30d3a2",
   "files": [
+    {
+      "path": ".gitattributes",
+      "sha256": "ce87555b58d695c4da3a80448633a11400c2c786e185c5535ad08e1924895778",
+      "size": 282
+    },
     {
       "path": ".github/workflows/mac-mobile-test.yml",
       "sha256": "7beee44d54295164ae38dbc011d13c2db67b6acb451a3505078e1f24185f998c",
@@ -16,13 +21,13 @@
     },
     {
       "path": ".github/workflows/platform-check.yml",
-      "sha256": "c14b246a82ccf5646e2c6a130f0cb5d802ddd41f808fd25b7be9a162f5449e88",
-      "size": 4129
+      "sha256": "3bccb1f183f3260f9c2b62aada11a96a03477dae629488d79fc3fa6cfeec3733",
+      "size": 4325
     },
     {
       "path": ".github/workflows/release-build.yml",
-      "sha256": "270f9131e8efc8b6ab10be6c4e76f219bc1e9e6771e3ae15b6aab86402aad05c",
-      "size": 3181
+      "sha256": "011558ed0833c7cdb939522f487faa6fbd9b41c3c1bee5de9f99ec44d88b9bcf",
+      "size": 3279
     },
     {
       "path": ".gitignore",
@@ -2686,8 +2691,8 @@
     },
     {
       "path": "package.json",
-      "sha256": "e221c34f9bde9ef56cdde68f1a14c560ddc7212cd9172360d46b835ca8f5a35b",
-      "size": 8900
+      "sha256": "205574858ec90f7af17e7fa1f1ab958f8d58fedad0dceaf52ed7d2e8cebff1da",
+      "size": 8940
     },
     {
       "path": "public/favicon.png",
@@ -3311,8 +3316,8 @@
     },
     {
       "path": "scripts/one-click-release.ps1",
-      "sha256": "acd1d8802ae6d4945ced902fd1492af0d9a3cb2be8851a6c87e7ba955c238716",
-      "size": 34328
+      "sha256": "5fb0ab13abc5bccdfb9ed571566f36ccfd77aad250a3ab8ba114430f6cd71de5",
+      "size": 35032
     },
     {
       "path": "scripts/online-payment-config.test.mjs",
@@ -3406,8 +3411,8 @@
     },
     {
       "path": "scripts/public-source-release-guard.test.mjs",
-      "sha256": "53c94de4fb76778d7b579a68e13cbaf19ad6cf836f7b9ea4542e049c8a5b76c3",
-      "size": 30034
+      "sha256": "9dd79ed067b4924858505781021aca388030642daf210c2faa1c180aaac87c58",
+      "size": 37671
     },
     {
       "path": "scripts/publish-codex-themes.ps1",
@@ -3431,8 +3436,8 @@
     },
     {
       "path": "scripts/release-tooling.test.mjs",
-      "sha256": "da3ca3d98097ce11d8f790b93d3d2d6f0e4f17d98966eed500f3f59352141bc7",
-      "size": 13119
+      "sha256": "51091562ca12020dc4bc9f05318ff275d906ef17c7b944236855aa398ce25ff3",
+      "size": 15315
     },
     {
       "path": "scripts/release-via-public-build-repo.ps1",
@@ -3596,13 +3601,13 @@
     },
     {
       "path": "scripts/verify-public-source.mjs",
-      "sha256": "191f0b1f6f504ce5de3ada452655ec0a95b0ec2dbfddefd8c46f0a6ef0139e55",
-      "size": 25972
+      "sha256": "20669ed94122f37aa45b45d83cd7ec7dc0ff10f70622e91b1c73bb4b21ae2a8f",
+      "size": 27276
     },
     {
       "path": "scripts/verify-public-source.test.mjs",
-      "sha256": "5dc8fa60fb8d493d413ade86a6b1451768c561fe96c03ce06a25bb987083f35e",
-      "size": 38073
+      "sha256": "84b25e311ea94155446b5654afd90e81c36e306e7131e0973f092b810604471e",
+      "size": 45115
     },
     {
       "path": "scripts/verify-release-artifacts.mjs",
@@ -3621,8 +3626,8 @@
     },
     {
       "path": "scripts/verify-workflows.mjs",
-      "sha256": "61b172c6459f13ff9c173bdcde88093519116ae5eaf1ae4d6b97823dd1a98b82",
-      "size": 8493
+      "sha256": "d12dee42af9ccdaa1b023ef752ce7fb155dfeb4fed96c96473ba9c4a1fb8e975",
+      "size": 9122
     },
     {
       "path": "src-tauri/.gitignore",
@@ -4786,8 +4791,8 @@
     },
     {
       "path": "src/components/新版主题.vue",
-      "sha256": "0d829ed541b15082b6d2fa64ab72fed1f6cdd7d1ff78771d344ec2cc329eedad",
-      "size": 1326100
+      "sha256": "1d4bb3a2106ad9ba14fdfe727dcc35d85e5115ccc4392620649572694868929b",
+      "size": 1326116
     },
     {
       "path": "src/desktop-api.ts",

@@ -18,6 +18,9 @@ jobs:
   verify:
     runs-on: ubuntu-22.04
     steps:
+      - name: Preserve exact Git blob bytes
+        run: git config --global core.autocrlf false
+
       - uses: actions/checkout@v4
 
       - uses: actions/setup-node@v4
@@ -71,6 +74,9 @@ jobs:
   macos-secure-storage:
     runs-on: macos-latest
     steps:
+      - name: Preserve exact Git blob bytes
+        run: git config --global core.autocrlf false
+
       - uses: actions/checkout@v4
 
       - uses: actions/setup-node@v4

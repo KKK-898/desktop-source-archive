@@ -4052,8 +4052,8 @@ const projectOutsourcingApprovedCount = computed(() => visibleProjectOutsourcing
 const projectOutsourcingRejectedCount = computed(() => visibleProjectOutsourcingRecords.value.filter((item) => item.status === 'rejected').length)
 const updateVersionText = computed(() => updateStatus.value.version || packageMetadata.version)
 // Link the installed build to its exact corresponding source, not the moving main branch.
-const releaseSourceUrl = `https://github.com/KKK-898/Gaoge-Free-Desktop/tree/v${packageMetadata.version}`
-const releaseLicenseUrl = `https://github.com/KKK-898/Gaoge-Free-Desktop/blob/v${packageMetadata.version}/LICENSE`
+const releaseSourceUrl = `https://github.com/KKK-898/Gaoge-Free-Desktop/tree/${packageMetadata.sourceReleaseTag}`
+const releaseLicenseUrl = `https://github.com/KKK-898/Gaoge-Free-Desktop/blob/${packageMetadata.sourceReleaseTag}/LICENSE`
 const updateButtonText = computed(() => {
   if (updateStatus.value.state === 'restarting') return '正在重启...'
   if (updateStatus.value.downloaded) return '立即安装'

@@ -2,6 +2,9 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import { spawnSync } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
+import fs from 'node:fs'
+import os from 'node:os'
+import path from 'node:path'
 import {
   buildMirrorManifest,
   canonicalServerDirectory,
@@ -270,3 +273,41 @@ try { & $failedRelease } catch { $failure = $_.Exception.Message }
   assert.match(result.failure, /Synthetic workflow failed/)
   assert.match(result.failure, /privacy could not be confirmed.*status unavailable/i)
 })
+
+// Run the real workflow verifier in isolated fixtures; never edit the checkout.
+function checkExactCheckoutFixture(change) {
+  const root = fileURLToPath(new URL('../', import.meta.url))
+  const fixture = fs.mkdtempSync(path.join(os.tmpdir(), 'gaoge-workflow-byte-test-'))
+  try {
+    fs.mkdirSync(path.join(fixture, 'scripts'), { recursive: true })
+    fs.cpSync(path.join(root, '.github'), path.join(fixture, '.github'), { recursive: true })
+    fs.copyFileSync(path.join(root, '.gitattributes'), path.join(fixture, '.gitattributes'))
+    fs.copyFileSync(path.join(root, 'scripts/verify-workflows.mjs'), path.join(fixture, 'scripts/verify-workflows.mjs'))
+    change?.(fixture)
+    return spawnSync(process.execPath, [path.join(fixture, 'scripts/verify-workflows.mjs')], { encoding: 'utf8', timeout: 30000, windowsHide: true })
+  } finally { fs.rmSync(fixture, { recursive: true, force: true }) }
+}
+
+test('release workflows preserve exact source bytes before every checkout', () => {
+  const result = checkExactCheckoutFixture()
+  assert.equal(result.status, 0, result.stderr)
+})
+
+for (const workflow of ['release-build.yml', 'platform-check.yml']) {
+  test(`rejects ${workflow} when checkout byte protection is missing`, () => {
+    const result = checkExactCheckoutFixture((fixture) => {
+      const file = path.join(fixture, '.github/workflows', workflow)
+      fs.writeFileSync(file, fs.readFileSync(file, 'utf8').replace(/      - name: Preserve exact Git blob bytes\r?\n        run: git config --global core.autocrlf false\r?\n\r?\n/, ''))
+    })
+    assert.equal(result.status, 1)
+    assert.match(result.stderr, /must disable Git newline conversion before every checkout/)
+  })
+}
+
+for (const attrs of ['* text eol=lf\n', '# no byte policy\n']) {
+  test(`rejects attributes without exact byte preservation: ${attrs.trim()}`, () => {
+    const result = checkExactCheckoutFixture((fixture) => fs.writeFileSync(path.join(fixture, '.gitattributes'), attrs))
+    assert.equal(result.status, 1)
+    assert.match(result.stderr, /preserve exact LF\/CRLF blob bytes/)
+  })
+}

@@ -32,6 +32,9 @@ jobs:
     runs-on: ${{ matrix.os }}
 
     steps:
+      - name: Preserve exact Git blob bytes
+        run: git config --global core.autocrlf false
+
       - uses: actions/checkout@v4
 
       - uses: actions/setup-node@v4

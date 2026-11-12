@@ -14,7 +14,7 @@ const OWNER_EVIDENCE = 'scripts/public-source-docs/owner-release-decision-1.7.1.
 const OWNER_EVIDENCE_SHA256 = 'a95d09b14f963a65fe2a07e6cd3929a85c83a10185fc7afda4538f2b94f05704'
 const OWNER_DECISION_ID = 'gaoge-1.7.1-2026-11-12'
 const OWNER_VERSION = '1.7.1'
-const BUFFERED_FILES = new Set([...METADATA, RIGHTS_AUDIT, OWNER_EVIDENCE])
+const BUFFERED_FILES = new Set([...METADATA, RIGHTS_AUDIT, OWNER_EVIDENCE, 'package.json'])
 const UNVERIFIED_STATUSES = new Set([
   'unverified-language-pack', 'unverified-embedded-proprietary-native-query',
   'unverified-proprietary-native-code', 'unverified-customer-logo-permission',
@@ -364,13 +364,30 @@ function equalFiles(left, right, label) {
   }
 }
 
+function validateSourceReleaseTag(files, tag, version, label) {
+  const item = files.get('package.json')
+  const buildRevision = tag !== `v${version}`
+  requireThat(item || !buildRevision, `${label}: build revision requires package.json sourceReleaseTag`)
+  if (!item) return // Legacy base tags may predate release-source metadata.
+  const metadata = parseJson(item, `${label} package.json`)
+  requireThat(metadata && typeof metadata === 'object' && !Array.isArray(metadata), `${label}: invalid package.json`)
+  requireThat(metadata.version === version, `${label}: package version does not match release tag`)
+  if (!Object.hasOwn(metadata, 'sourceReleaseTag')) {
+    requireThat(!buildRevision, `${label}: build revision requires package.json sourceReleaseTag`)
+    return
+  }
+  requireThat(typeof metadata.sourceReleaseTag === 'string' && metadata.sourceReleaseTag === tag, `${label}: package sourceReleaseTag does not match selected release tag`)
+}
+
 export async function verifyPublicSource({ repository, tag, sourceDirectory }, { fetchImpl = globalThis.fetch } = {}) {
   requireThat(typeof repository === 'string' && /^[A-Za-z0-9][A-Za-z0-9-]{0,38}\/[A-Za-z0-9][A-Za-z0-9_.-]{0,99}$/.test(repository)
     && !repository.endsWith('.git') && !repository.includes('..'), 'repository must be a GitHub owner/repository, not a URL')
-  requireThat(typeof tag === 'string' && /^v(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)$/.test(tag), 'tag must use vX.Y.Z format')
-  const version = tag.slice(1)
+  const releaseTag = typeof tag === 'string' && /^v((?:0|[1-9]\d*)\.(?:0|[1-9]\d*)\.(?:0|[1-9]\d*))(?:-build\.[1-9]\d*)?$/.exec(tag)
+  requireThat(releaseTag && releaseTag[0] === tag, 'tag must use vX.Y.Z or vX.Y.Z-build.N format, where N is a positive integer')
+  const version = releaseTag[1]
   const local = await readLocalSnapshot(sourceDirectory)
   const { manifest } = validateSnapshot(local.files, local.directories, version, 'local')
+  validateSourceReleaseTag(local.files, tag, version, 'local')
   const info = await apiJson(fetchImpl, `https://api.github.com/repos/${repository}`)
   requireThat(info?.private === false && info.visibility === 'public', 'GitHub source repository is not explicitly public')
   requireThat(typeof info.full_name === 'string' && info.full_name.toLowerCase() === repository.toLowerCase()
@@ -379,11 +396,13 @@ export async function verifyPublicSource({ repository, tag, sourceDirectory }, {
   const archive = await anonymousRequest(fetchImpl, `https://codeload.github.com/${repository}/zip/${pinned.commit}`, MAX_ARCHIVE)
   const remote = await readSourceArchive(archive, `${info.name}-${pinned.commit}`)
   validateSnapshot(remote.files, remote.directories, version, 'public')
+  validateSourceReleaseTag(remote.files, tag, version, 'public')
   equalFiles(local.files, remote.files, 'Public source and local snapshot')
   const unchanged = await resolveTag(fetchImpl, repository, tag)
   requireThat(unchanged.commit === pinned.commit && unchanged.refSha === pinned.refSha && unchanged.refType === pinned.refType, 'Public tag changed during verification')
   const finalLocal = await readLocalSnapshot(sourceDirectory)
   validateSnapshot(finalLocal.files, finalLocal.directories, version, 'local recheck')
+  validateSourceReleaseTag(finalLocal.files, tag, version, 'local recheck')
   equalFiles(local.files, finalLocal.files, 'Local snapshot changed during verification')
   return { verified: true, repository: info.full_name, tag, publicCommit: pinned.commit, sourceCommit: manifest.sourceCommit, version, fileCount: remote.files.size }
 }

@@ -19,11 +19,11 @@ Set-StrictMode -Version Latest
 $tokens = $null; $parseErrors = $null
 $ast = [System.Management.Automation.Language.Parser]::ParseFile($env:GAOGE_RELEASE_SCRIPT_UNDER_TEST, [ref]$tokens, [ref]$parseErrors)
 if ($parseErrors.Count) { throw 'Release script must parse without errors.' }
-$names = @('Assert-PublicSourceRelease', 'Confirm-PublicSourceRelease', 'Assert-BuildMatchesPublicSource', 'Export-BuildSnapshot')
+$names = @('Assert-ReleaseTag', 'Assert-PublicSourceRelease', 'Confirm-PublicSourceRelease', 'Assert-BuildMatchesPublicSource', 'Export-BuildSnapshot', 'Find-Or-RunWorkflow')
 $definitions = @($ast.FindAll({ param($node) $node -is [System.Management.Automation.Language.FunctionDefinitionAst] }, $false) | Where-Object { $names -contains $_.Name })
 if ($definitions.Count -ne $names.Count) { throw 'Missing production corresponding-source guard.' }
-$allowedCommands = @('Write-Step', 'Write-Info', 'Invoke-Captured', 'ConvertFrom-Json', 'Join-Path', 'Assert-SafeTempPath', 'Confirm-PublicSourceRelease', 'Test-Path', 'New-Item', 'Out-Null', 'Get-ChildItem', 'ForEach-Object', 'Copy-Item', 'Where-Object', 'Push-Location', 'Invoke-Checked', 'Pop-Location')
-$allowedMethods = @('GetFullPath', 'IsNullOrWhiteSpace', 'Trim', 'NewGuid', 'ToString')
+$allowedCommands = @('Write-Step', 'Write-Info', 'Invoke-Captured', 'ConvertFrom-Json', 'Join-Path', 'Assert-SafeTempPath', 'Confirm-PublicSourceRelease', 'Test-Path', 'New-Item', 'Out-Null', 'Get-ChildItem', 'ForEach-Object', 'Copy-Item', 'Where-Object', 'Push-Location', 'Invoke-Checked', 'Pop-Location', 'Select-Object', 'Start-Sleep')
+$allowedMethods = @('GetFullPath', 'IsNullOrWhiteSpace', 'Trim', 'NewGuid', 'ToString', 'Escape', 'IsMatch')
 foreach ($definition in $definitions) {
   foreach ($command in @($definition.Body.FindAll({ param($node) $node -is [System.Management.Automation.Language.CommandAst] }, $true))) {
     $commandName = $command.GetCommandName()
@@ -40,6 +40,7 @@ foreach ($definition in $definitions) {
 }
 $script:Root = [IO.Path]::GetDirectoryName([IO.Path]::GetDirectoryName($env:GAOGE_RELEASE_SCRIPT_UNDER_TEST))
 $script:Version = '1.7.1'
+$script:ReleaseTag = 'v1.7.1'
 $script:PublicSourceRepository = 'synthetic/public-source'
 $script:BuildRepo = 'synthetic/private-build'
 if ([string]::IsNullOrWhiteSpace($env:TEMP)) { $env:TEMP = [IO.Path]::GetTempPath() }
@@ -49,7 +50,7 @@ $script:PackageVersion = $Version
 $script:ExportVersion = $Version
 $script:ExportReleaseReady = $true
 $script:ExportDirectoryMismatch = $false
-$script:VerificationResult = [pscustomobject]@{verified=$true;version=$Version;publicCommit=('a' * 40);sourceCommit=('c' * 40)}
+$script:VerificationResult = [pscustomobject]@{verified=$true;version=$Version;tag=$ReleaseTag;publicCommit=('a' * 40);sourceCommit=('c' * 40)}
 $script:PublicTree = 'd' * 40
 $script:BuildTree = 'd' * 40
 $script:TagCommit = 'c' * 40
@@ -57,6 +58,10 @@ $script:BuildCommit = 'e' * 40
 $script:WorkRootExists = $false
 $script:ExistingWorkRoot = ''
 $script:SnapshotDirectory = ''
+$script:WorkflowRuns = @()
+$script:WorkflowDispatched = $false
+$script:WorkflowBranchOverride = ''
+$script:WorkflowCompletionBranchOverride = ''
 $script:Events = [System.Collections.Generic.List[string]]::new()
 $script:Queries = [System.Collections.Generic.List[object]]::new()
 $script:Mutations = [System.Collections.Generic.List[object]]::new()
@@ -92,6 +97,17 @@ function Invoke-Captured {
     $script:Events.Add('verify')
     return ($script:VerificationResult | ConvertTo-Json -Compress)
   }
+  if ($FilePath -eq 'gh' -and $Arguments[0] -eq 'run' -and $Arguments[1] -eq 'list') {
+    $script:Events.Add('gh:run-list')
+    if (-not $script:WorkflowDispatched) { return (ConvertTo-Json -InputObject @($script:WorkflowRuns) -Compress) }
+    $branch = if ($script:WorkflowBranchOverride) { $script:WorkflowBranchOverride } else { $ReleaseTag }
+    return (ConvertTo-Json -InputObject @([pscustomobject]@{databaseId=123;headSha=$script:BuildCommit;headBranch=$branch;status='in_progress';conclusion='';url='https://example.invalid/build/123'}) -Compress)
+  }
+  if ($FilePath -eq 'gh' -and $Arguments[0] -eq 'run' -and $Arguments[1] -eq 'view') {
+    $script:Events.Add('gh:run-view')
+    $branch = if ($script:WorkflowCompletionBranchOverride) { $script:WorkflowCompletionBranchOverride } else { $ReleaseTag }
+    return (@{databaseId=123;headSha=$script:BuildCommit;headBranch=$branch;status='completed';conclusion='success';url='https://example.invalid/build/123'} | ConvertTo-Json -Compress)
+  }
   if ($FilePath -eq 'gh' -and $Arguments.Count -eq 4 -and $Arguments[0] -eq 'api' -and $Arguments[2] -eq '--jq' -and $Arguments[3] -eq '.tree.sha') {
     if ($Arguments[1] -eq "repos/$PublicSourceRepository/git/commits/$($script:VerificationResult.publicCommit)") { $script:Events.Add('gh:public-tree'); return $script:PublicTree }
     if ($Arguments[1] -eq "repos/$($script:BuildRepo)/git/commits/$($script:BuildCommit)") { $script:Events.Add('gh:build-tree'); return $script:BuildTree }
@@ -100,10 +116,17 @@ function Invoke-Captured {
 }
 function Invoke-Checked {
   param([string]$FilePath, [Parameter(ValueFromRemainingArguments=$true)][string[]]$Arguments)
+  if ($FilePath -eq 'gh' -and (($Arguments[0] -eq 'workflow' -and $Arguments[1] -eq 'run') -or ($Arguments[0] -eq 'run' -and $Arguments[1] -eq 'watch'))) {
+    $script:Mutations.Add([pscustomobject]@{operation='gh';arguments=@($Arguments)})
+    $script:Events.Add("mutation:gh:$($Arguments[0])")
+    if ($Arguments[0] -eq 'workflow') { $script:WorkflowDispatched = $true }
+    return
+  }
   if ($FilePath -ne 'git' -or $Arguments[0] -notin @('init', 'config', 'checkout', 'add', 'commit', 'remote', 'push', 'tag')) { throw 'Unexpected external mutation.' }
   $script:Events.Add("mutation:git:$($Arguments[0])")
   $script:Mutations.Add([pscustomobject]@{operation='git';arguments=@($Arguments)})
 }
+function Start-Sleep { param([int]$Seconds) $script:Events.Add('wait:stubbed') }
 function Test-Path {
   param([string]$LiteralPath)
   $script:Events.Add('filesystem:exists')
@@ -217,6 +240,7 @@ Complete-Scenario { Confirm-PublicSourceRelease }
 for (const [label, change] of [
   ['unverified public source', '$script:VerificationResult.verified = $false'],
   ['a public version mismatch', "$script:VerificationResult.version = '1.7.0'"],
+  ['a public release tag mismatch', "$script:VerificationResult.tag = 'v1.7.1-build.2'"],
 ]) {
   test(`verification rejects ${label}`, () => {
     const result = releaseGuardScenario(change + String.raw`
@@ -232,7 +256,7 @@ test('moving the public source tag after its first verification blocks release',
   const result = releaseGuardScenario(String.raw`
 Complete-Scenario {
   Assert-PublicSourceRelease 'HEAD'
-  $script:VerificationResult = [pscustomobject]@{verified=$true;version=$Version;publicCommit=('b' * 40);sourceCommit=('c' * 40)}
+  $script:VerificationResult = [pscustomobject]@{verified=$true;version=$Version;tag=$ReleaseTag;publicCommit=('b' * 40);sourceCommit=('c' * 40)}
   Confirm-PublicSourceRelease
 }
 `)
@@ -503,6 +527,7 @@ foreach ($method in @($definitions[0].Body.FindAll({ param($node) $node -is [Sys
 . ([scriptblock]::Create($definitions[0].Extent.Text))
 $script:Root = $env:GAOGE_SOURCE_VERSION_FIXTURE
 $script:Version = '1.7.1'
+$script:ReleaseTag = 'v1.7.1'
 $script:QueryCount = 0
 function Write-Step([string]$Message) {}
 function Invoke-Captured {
@@ -570,4 +595,101 @@ test('Cargo package version cannot be masked by the same version in an unrelated
   })
   assert.match(result.error, /All version fields must be committed at 1\.7\.1/)
   assert.equal(result.queries, 1)
+})
+
+
+test('release tag defaults to the original version tag without changing product version', () => {
+  const result = releaseGuardScenario(String.raw`
+$probe = [scriptblock]::Create($ast.ParamBlock.Extent.Text + [Environment]::NewLine + 'Assert-ReleaseTag; return @{tag=$ReleaseTag;version=$Version}')
+Complete-Scenario { & $probe -Version '1.7.1' }
+`)
+  assert.equal(result.error, '')
+  assert.deepEqual(result.value, { tag: 'v1.7.1', version: '1.7.1' })
+  assert.deepEqual(result.queries, [])
+  assert.deepEqual(result.mutations, [])
+})
+
+for (const tag of ['v1.7.2', 'v1.7.2-build.2', 'v1.7.1-build.0', 'v1.7.1-build.02', 'v1.7.1-build.-1', 'v1.7.1-build.2-extra', 'V1.7.1', 'v1.7.1-build.2\n']) {
+  test(`release entry rejects nonmatching or malformed immutable tag ${JSON.stringify(tag)}`, () => {
+    const value = Buffer.from(tag).toString('base64')
+    const result = releaseGuardScenario(`$script:ReleaseTag = [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('${value}'))\nComplete-Scenario { Assert-ReleaseTag }`)
+    expectBlocked(result, /ReleaseTag must be v1\.7\.1 or v1\.7\.1-build\.N/)
+    assert.deepEqual(result.queries, [], 'invalid tags must fail without querying external state')
+  })
+}
+
+test('build.2 flows through anonymous source verification, build tags, workflow ref, and recheck', () => {
+  const result = releaseGuardScenario(String.raw`
+$script:ReleaseTag = 'v1.7.1-build.2'
+$script:VerificationResult.tag = $ReleaseTag
+Complete-Scenario {
+  Assert-ReleaseTag
+  Assert-PublicSourceRelease 'HEAD'
+  $sha = Export-BuildSnapshot $ReleaseTag 'synthetic-build'
+  Assert-BuildMatchesPublicSource $sha
+  Find-Or-RunWorkflow $sha $ReleaseTag
+  Confirm-PublicSourceRelease
+}
+`)
+  assert.equal(result.error, '')
+  assert.equal(result.verification.version, '1.7.1')
+  assert.equal(result.verification.tag, 'v1.7.1-build.2')
+  const queries = result.queries
+  for (const query of queries.filter(query => query.file === 'node')) assert.equal(query.arguments[query.arguments.indexOf('--tag') + 1], 'v1.7.1-build.2')
+  assert.deepEqual(queries.find(query => query.file === 'git' && query.arguments[0] === 'rev-list').arguments, ['rev-list', '-n', '1', 'v1.7.1-build.2'])
+  const git = result.mutations.filter(entry => entry.operation === 'git')
+  assert.ok(git.some(entry => JSON.stringify(entry.arguments) === JSON.stringify(['tag', 'v1.7.1-build.2'])))
+  assert.ok(git.some(entry => JSON.stringify(entry.arguments) === JSON.stringify(['push', 'origin', 'v1.7.1-build.2'])))
+  assert.ok(git.some(entry => entry.arguments[0] === 'commit' && entry.arguments.at(-1) === 'release: build snapshot v1.7.1-build.2'))
+  for (const query of queries.filter(query => query.file === 'gh' && query.arguments[0] === 'run' && query.arguments[1] === 'list')) assert.equal(query.arguments[query.arguments.indexOf('--branch') + 1], 'v1.7.1-build.2')
+  const dispatch = result.mutations.find(entry => entry.operation === 'gh' && entry.arguments[0] === 'workflow')
+  assert.equal(dispatch.arguments[dispatch.arguments.indexOf('--ref') + 1], 'v1.7.1-build.2')
+  assert.ok(!git.some(entry => entry.arguments.includes('v1.7.1')), 'the original tag must not be recreated, pushed, or rewritten')
+})
+
+for (const status of ['completed', 'in_progress']) {
+  test(`workflow never reuses a ${status} run of another tag with the same commit`, () => {
+    const result = releaseGuardScenario(`
+$script:ReleaseTag = 'v1.7.1-build.2'
+$script:WorkflowRuns = @([pscustomobject]@{databaseId=99;headSha=$script:BuildCommit;headBranch='v1.7.1';status='${status}';conclusion='${status === 'completed' ? 'success' : ''}';url='https://example.invalid/build/99'})
+Complete-Scenario { Find-Or-RunWorkflow $script:BuildCommit $ReleaseTag }
+`)
+    assert.equal(result.error, '')
+    assert.equal(result.value.databaseId, 123)
+    assert.ok(result.mutations.some(entry => entry.operation === 'gh' && entry.arguments[0] === 'workflow'))
+  })
+}
+
+test('workflow completion must still identify the selected immutable tag', () => {
+  const result = releaseGuardScenario(String.raw`
+$script:ReleaseTag = 'v1.7.1-build.2'
+$script:WorkflowCompletionBranchOverride = 'v1.7.1'
+Complete-Scenario { Find-Or-RunWorkflow $script:BuildCommit $ReleaseTag }
+`)
+  assert.match(result.error, /Release Build did not complete successfully/)
+})
+
+test('release entry validates the tag before config reads and retains one selected tag throughout', () => {
+  const script = readFileSync(productionScript, 'utf8')
+  assert.match(script, /\[string\] \$ReleaseTag = "v\$Version"/)
+  assert.match(script, /Assert-VersionOrder\s+Assert-ReleaseTag\s+Write-Info[^\n]*\$ReleaseTag[^\n]*\s+\$config = Read-ReleaseConfig/)
+  assert.match(script, /\$tagName = \$ReleaseTag/)
+  assert.doesNotMatch(script, /\$tagName = "v\$Version"|--tag "v\$Version"/)
+  assert.match(script, /Get-RemoteTagSha "origin" \$tagName/)
+  assert.match(script, /Export-BuildSnapshot \$tagName \$buildBranch/)
+  assert.match(script, /Find-Or-RunWorkflow \$buildSha \$tagName/)
+  assert.match(script, /tag = \$tagName/)
+  assert.match(script, /publicSourceUrl = "https:\/\/github\.com\/\$PublicSourceRepository\/tree\/\$tagName"/)
+})
+
+
+test('adding ReleaseTag preserves existing positional Version and MinimumVersion arguments', () => {
+  const result = releaseGuardScenario(String.raw`
+$probe = [scriptblock]::Create($ast.ParamBlock.Extent.Text + [Environment]::NewLine + 'Assert-ReleaseTag; return @{tag=$ReleaseTag;version=$Version;minimumVersion=$MinimumVersion}')
+Complete-Scenario { & $probe '1.7.1' '1.6.3' }
+`)
+  assert.equal(result.error, '')
+  assert.deepEqual(result.value, { tag: 'v1.7.1', version: '1.7.1', minimumVersion: '1.6.3' })
+  assert.deepEqual(result.queries, [])
+  assert.deepEqual(result.mutations, [])
 })

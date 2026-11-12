@@ -31,6 +31,13 @@ function assertPlatformMatrix(text, label) {
 
 function assertCommonSetup(text, label) {
   assertIncludes(text, 'actions/checkout@v4', `${label} checkout step`)
+  const checkoutSteps = [...text.matchAll(/^      - uses: actions\/checkout@v4/gm)]
+  for (const checkout of checkoutSteps) {
+    const before = text.slice(0, checkout.index)
+    if (!before.endsWith('      - name: Preserve exact Git blob bytes\n        run: git config --global core.autocrlf false\n\n')) {
+      throw new Error(`${label} must disable Git newline conversion before every checkout`)
+    }
+  }
   assertIncludes(text, 'actions/setup-node@v4', `${label} setup-node step`)
   assertIncludes(text, 'node-version: 22', `${label} Node version`)
   assertIncludes(text, 'cache-dependency-path: package-lock.json', `${label} npm cache path`)
@@ -42,6 +49,10 @@ function assertCommonSetup(text, label) {
 async function main() {
   const platformCheck = await readWorkflow('platform-check.yml')
   const releaseBuild = await readWorkflow('release-build.yml')
+  const attributes = await fs.readFile(path.join(rootDir, '.gitattributes'), 'utf8')
+  if (!/^\* -text\s*$/m.test(attributes)) {
+    throw new Error('Repository must preserve exact LF/CRLF blob bytes with * -text')
+  }
 
   assertIncludes(platformCheck, 'name: Platform Check', 'Platform Check workflow')
   assertIncludes(platformCheck, 'workflow_dispatch:', 'Platform Check manual trigger')

@@ -1,0 +1,5 @@
+# Preserve exact Git blob bytes for audited source and assets.
+# Do not normalize existing LF or CRLF content during checkout.
+* -text
+# Treat preserved CRLF as line endings while retaining normal whitespace checks.
+* whitespace=blank-at-eol,blank-at-eof,space-before-tab,cr-at-eol

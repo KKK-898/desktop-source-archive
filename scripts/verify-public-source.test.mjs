@@ -35,6 +35,13 @@ function snapshot() {
   return files
 }
 
+function withSourceReleaseTag(files, tag, version = '1.7.1') {
+  const records = new Map([...files].map(([name, bytes]) => [name, sourceItem(bytes)]))
+  records.set('package.json', sourceItem(json({ version, ...(tag === undefined ? {} : { sourceReleaseTag: tag }) })))
+  rebuildSnapshotMetadata(records)
+  return new Map([...records].map(([name, item]) => [name, item.bytes]))
+}
+
 function patchJson(files, name, edit) {
   const value = JSON.parse(files.get(name).toString())
   edit(value)
@@ -85,7 +92,7 @@ async function localFixture(t, files = snapshot()) {
   return directory
 }
 
-function fakeGitHub(archive, { publicRepo = true, annotated = false, changeTag = false, status = 200, onArchive } = {}) {
+function fakeGitHub(archive, { publicRepo = true, annotated = false, changeTag = false, status = 200, onArchive, tag = TAG } = {}) {
   const calls = []
   let refRequests = 0
   const base = `https://api.github.com/repos/${REPOSITORY}`
@@ -97,10 +104,10 @@ function fakeGitHub(archive, { publicRepo = true, annotated = false, changeTag =
     assert.equal(Object.keys(options.headers).some((key) => /authorization|cookie/i.test(key)), false)
     if (status !== 200) return new Response('unavailable', { status })
     if (url === base) return new Response(json({ name: 'Gaoge-Free-Desktop', full_name: REPOSITORY, private: !publicRepo, visibility: publicRepo ? 'public' : 'private' }))
-    if (url === `${base}/git/ref/tags/${TAG}`) {
+    if (url === `${base}/git/ref/tags/${tag}`) {
       refRequests += 1
       const sha = changeTag && refRequests > 1 ? '5'.repeat(40) : (annotated ? TAG_OBJECT : PUBLIC_COMMIT)
-      return new Response(json({ ref: `refs/tags/${TAG}`, object: { type: annotated ? 'tag' : 'commit', sha } }))
+      return new Response(json({ ref: `refs/tags/${tag}`, object: { type: annotated ? 'tag' : 'commit', sha } }))
     }
     if (url === `${base}/git/tags/${TAG_OBJECT}`) return new Response(json({ sha: TAG_OBJECT, object: { type: 'commit', sha: PUBLIC_COMMIT } }))
     if (url === `https://codeload.github.com/${REPOSITORY}/zip/${PUBLIC_COMMIT}`) {
@@ -535,3 +542,112 @@ for (const [label, changes, message] of [
     assert.throws(() => validateSnapshot(files, new Set(), '1.7.1'), message)
   })
 }
+
+
+for (const annotated of [false, true]) {
+  test(`build revision tag retains base-version audit and exact public bytes (${annotated ? 'annotated' : 'lightweight'})`, async (t) => {
+    const tag = 'v1.7.1-build.2'
+    const files = withSourceReleaseTag(snapshot(), tag), directory = await localFixture(t, files)
+    const github = fakeGitHub(sourceZip(files), { annotated, tag })
+    const result = await verifyPublicSource({ ...options(directory), tag }, github)
+    assert.deepEqual(result, { verified: true, repository: REPOSITORY, tag, publicCommit: PUBLIC_COMMIT, sourceCommit: SOURCE_COMMIT, version: '1.7.1', fileCount: 5 })
+    assert.equal(github.calls.filter(call => call.url.endsWith(`/git/ref/tags/${tag}`)).length, 2)
+    assert.ok(!github.calls.some(call => call.url.endsWith(`/git/ref/tags/${TAG}`)))
+  })
+}
+
+for (const tag of ['v1.7.1-build.0', 'v1.7.1-build.02', 'v1.7.1-build.-2', 'v1.7.1-build.2.1', 'v1.7.1-build.2-extra', 'v1.7.1-build.2\n', 'V1.7.1-build.2', 'v1.7.1-rc.2']) {
+  test(`rejects malformed build revision ${JSON.stringify(tag)} before reading source or networking`, async () => {
+    await assert.rejects(verifyPublicSource({ repository: REPOSITORY, tag, sourceDirectory: '/unused' }, { fetchImpl: async () => assert.fail('unexpected fetch') }), /tag must use vX.Y.Z/)
+  })
+}
+
+test('a build revision cannot substitute a different base release version', async (t) => {
+  const directory = await localFixture(t)
+  await assert.rejects(verifyPublicSource({ ...options(directory), tag: 'v1.7.2-build.2' }, { fetchImpl: async () => assert.fail('unexpected fetch') }), /version/i)
+})
+
+test('build revision CLI preserves its exact immutable tag', () => {
+  const sourceDirectory = path.resolve(os.tmpdir(), 'synthetic-source')
+  assert.deepEqual(parseArguments(['--repository', REPOSITORY, '--tag=v1.7.1-build.2', `--source-directory=${sourceDirectory}`]), { ...options(sourceDirectory), tag: 'v1.7.1-build.2' })
+})
+
+
+
+async function ownerPublicationBytes() {
+  const records = ownerPublicationSnapshot()
+  for (const [name, item] of records) {
+    if (item.bytes) continue
+    const bytes = await readFile(new URL(`../${name}`, import.meta.url))
+    assert.equal(hash(bytes), item.sha256, `real audited fixture must retain exact bytes: ${name}`)
+    records.set(name, sourceItem(bytes))
+  }
+  rebuildSnapshotMetadata(records)
+  return new Map([...records].map(([name, item]) => [name, item.bytes]))
+}
+
+test('build revision preserves all 50 exact owner disclosures and pinned evidence end to end', async (t) => {
+  const tag = 'v1.7.1-build.2'
+  const files = withSourceReleaseTag(await ownerPublicationBytes(), tag), directory = await localFixture(t, files)
+  const github = fakeGitHub(sourceZip(files), { tag })
+  const result = await verifyPublicSource({ ...options(directory), tag }, github)
+  assert.equal(result.version, '1.7.1')
+  assert.equal(result.tag, tag)
+  assert.equal(result.fileCount, files.size)
+  assert.equal(JSON.parse(files.get(REPORT)).rightsDisclosures.length, 50)
+})
+
+test('build revision still rejects modified pinned owner evidence even with refreshed file metadata', async (t) => {
+  const files = ownerPublicationSnapshot()
+  files.set(OWNER_EVIDENCE, sourceItem(Buffer.concat([evidenceBytes, Buffer.from('\nmodified')])))
+  rebuildSnapshotMetadata(files)
+  assert.throws(() => validateSnapshot(files, new Set(), '1.7.1'), /evidence hash mismatch/)
+  const bytes = withSourceReleaseTag(await ownerPublicationBytes(), 'v1.7.1-build.2')
+  bytes.set(OWNER_EVIDENCE, Buffer.concat([evidenceBytes, Buffer.from('\nmodified')]))
+  const directory = await localFixture(t, bytes)
+  await assert.rejects(verifyPublicSource({ ...options(directory), tag: 'v1.7.1-build.2' }, { fetchImpl: async () => assert.fail('unexpected fetch') }), /evidence|mismatch/i)
+})
+
+
+for (const declared of [undefined, 'v1.7.1', 'v1.7.1-build.3', 'v1.7.2-build.2', '', null, 2]) {
+  test(`build revision rejects missing or mismatched package sourceReleaseTag ${JSON.stringify(declared)}`, async (t) => {
+    const files = withSourceReleaseTag(snapshot(), declared), directory = await localFixture(t, files)
+    await assert.rejects(verifyPublicSource({ ...options(directory), tag: 'v1.7.1-build.2' }, { fetchImpl: async () => assert.fail('unexpected fetch') }), /sourceReleaseTag/)
+  })
+}
+
+test('build revision cannot use a package-free legacy snapshot', async (t) => {
+  const directory = await localFixture(t)
+  await assert.rejects(verifyPublicSource({ ...options(directory), tag: 'v1.7.1-build.2' }, { fetchImpl: async () => assert.fail('unexpected fetch') }), /sourceReleaseTag/)
+})
+
+for (const declared of [undefined, TAG]) {
+  test(`legacy base tag permits ${declared === undefined ? 'absent' : 'matching'} package sourceReleaseTag`, async (t) => {
+    const files = withSourceReleaseTag(snapshot(), declared), directory = await localFixture(t, files)
+    const result = await verifyPublicSource(options(directory), fakeGitHub(sourceZip(files)))
+    assert.equal(result.version, '1.7.1')
+    assert.equal(result.tag, TAG)
+  })
+}
+
+test('legacy base tag cannot claim another release source tag', async (t) => {
+  const files = withSourceReleaseTag(snapshot(), 'v1.7.1-build.2'), directory = await localFixture(t, files)
+  await assert.rejects(verifyPublicSource(options(directory), { fetchImpl: async () => assert.fail('unexpected fetch') }), /sourceReleaseTag/)
+})
+
+test('source-release metadata never bypasses package version consistency', async (t) => {
+  const tag = 'v1.7.1-build.2'
+  const files = withSourceReleaseTag(snapshot(), tag, '1.7.2'), directory = await localFixture(t, files)
+  await assert.rejects(verifyPublicSource({ ...options(directory), tag }, { fetchImpl: async () => assert.fail('unexpected fetch') }), /package version/)
+})
+
+test('the installed source and license links reference the immutable package release tag', async () => {
+  const metadata = JSON.parse(await readFile(new URL('../package.json', import.meta.url), 'utf8'))
+  const component = await readFile(new URL('../src/components/新版主题.vue', import.meta.url), 'utf8')
+  assert.equal(metadata.version, '1.7.1')
+  assert.equal(metadata.sourceReleaseTag, 'v1.7.1-build.2')
+  assert.ok(component.includes('const releaseSourceUrl = `https://github.com/KKK-898/Gaoge-Free-Desktop/tree/${packageMetadata.sourceReleaseTag}`'))
+  assert.ok(component.includes('const releaseLicenseUrl = `https://github.com/KKK-898/Gaoge-Free-Desktop/blob/${packageMetadata.sourceReleaseTag}/LICENSE`'))
+  assert.ok(!component.includes('/tree/v${packageMetadata.version}'))
+  assert.ok(!component.includes('/blob/v${packageMetadata.version}/LICENSE'))
+})
