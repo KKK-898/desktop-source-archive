@@ -1,14 +1,35 @@
 """Shared, dependency-free validation for independently distributed phone components."""
 import hashlib
 import json
+import os
 import re
 import tarfile
 from collections import deque
 from pathlib import Path, PurePosixPath
+from urllib.parse import urlsplit
 
 ROOT = Path(__file__).resolve().parents[1]
 PLATFORMS = ('windows-x86_64', 'macos-aarch64', 'macos-x86_64')
-BASE_URL = 'https://api.gaogeaii.com/mobile-components'
+def component_base_url():
+    """Use the same explicit manifest trust boundary as the desktop runtime."""
+    raw = os.environ.get('GAOGE_MOBILE_COMPONENT_MANIFEST_URL', '')
+    if not raw:
+        raise ValueError('GAOGE_MOBILE_COMPONENT_MANIFEST_URL must be explicitly configured')
+    try:
+        p = urlsplit(raw)
+        port = p.port
+    except ValueError as error:
+        raise ValueError('Invalid component manifest URL') from error
+    if (any(c.isspace() or ord(c) < 32 or ord(c) == 127 for c in raw)
+            or any(c in raw for c in ('\\', '%', '?', '#', '@'))
+            or p.scheme != 'https' or not p.hostname or p.hostname.endswith('.')
+            or port not in (None, 443) or p.username is not None or p.password is not None
+            or not re.fullmatch(r'/(?:[A-Za-z0-9._~-]+/)+[A-Za-z0-9._~-]+', p.path)
+            or any(part in ('.', '..') for part in p.path.split('/'))):
+        raise ValueError('Component manifest requires a clean HTTPS URL in a dedicated trusted directory')
+    host = '[' + p.hostname + ']' if ':' in p.hostname else p.hostname
+    return 'https://' + host + p.path.rsplit('/', 1)[0]
+
 
 
 def release_config():
@@ -155,9 +176,10 @@ def archive_details(filename, platform):
 
 
 def platform_metadata(filename, platform, config):
+    base_url = component_base_url()
     details = archive_details(filename, platform)
     return {
-        'url': f"{BASE_URL}/{config['version']}/{platform}.tar.gz",
+        'url': f"{base_url}/{config['version']}/{platform}.tar.gz",
         'sha256': digest_file(filename), 'size': Path(filename).stat().st_size,
         'unpackedSize': details['unpackedSize'], 'executable': executable_name(platform),
     }

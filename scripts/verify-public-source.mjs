@@ -166,6 +166,8 @@ export function validateSnapshot(files, directories, version, label = 'snapshot'
   }
   requireThat(report.sourceCommit === manifest.sourceCommit && report.sourceTree === manifest.sourceTree,
     `${label}: report and manifest source identity differ`)
+  requireThat(report.publicationKind !== 'development-snapshot' && manifest.publicationKind !== 'development-snapshot', `${label}: development snapshot is not release source`)
+  requireThat(report.publicationKind !== 'privacy-maintenance' && manifest.publicationKind !== 'privacy-maintenance', `${label}: privacy maintenance snapshot is not release source`)
   requireThat(report.releaseReady === true && report.sourceMode === 'git-ref', `${label}: export is not release-ready git-ref source`)
   requireThat(Array.isArray(report.checks) && report.checks.length > 0 && report.checks.every((check) => check?.ok === true), `${label}: export checks are incomplete or failing`)
   requireThat(Array.isArray(report.rightsFindings) && report.rightsFindings.length === 0, `${label}: unresolved rights findings`)

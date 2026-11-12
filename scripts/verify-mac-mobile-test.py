@@ -40,7 +40,7 @@ report = {
     'phoneComponent': 'downloaded on demand; excluded from app bundle', 'buildHost': platform.machine(),
     'workflowRun': os.environ.get('GITHUB_SERVER_URL', '') + '/' + os.environ.get('GITHUB_REPOSITORY', '') + '/actions/runs/' + run_id,
     'signing': 'ad-hoc; not Apple notarized',
-    'codexOnPhysicalMac': 'not tested', 'relay': 'https://api.gaogeaii.com/mobile',
+    'codexOnPhysicalMac': 'not tested', 'relay': os.environ.get('GAOGE_ACCOUNT_RELAY_URL', ''),
 }
 (output / 'build-info.json').write_text(json.dumps(report, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
 (output / 'SHA256SUMS.txt').write_text(digest + '  ' + target.name + '\n', encoding='utf-8')

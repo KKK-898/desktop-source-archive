@@ -27,5 +27,16 @@
       "publicBaseUrl": "https://legacy.example.com/gaogeaii/updates",
       "remoteRoot": "/var/www/gaogeaii/updates"
     }
-  ]
+  ],
+  "deployment": {
+    "GAOGE_DEFAULT_API_BASE_URL": "https://api.example.invalid/api",
+    "GAOGE_ACCOUNT_RELAY_URL": "https://relay.example.invalid/mobile",
+    "GAOGE_MOBILE_COMPONENT_MANIFEST_URL": "https://downloads.example.invalid/mobile-components/stable.json",
+    "VITE_GAOGE_CODEX_RELAY_ORIGINS": "https://api.example.invalid,https://backup.example.invalid",
+    "VITE_GAOGE_MOBILE_RELAY_URL": "https://relay.example.invalid/mobile",
+    "VITE_GAOGE_CONTACT_ITEMS": "[]",
+    "VITE_GAOGE_DESKTOP_EMAIL_DOMAIN": "desktop.example.invalid",
+    "VITE_GAOGE_SUPPORT_GROUP": "",
+    "VITE_GAOGE_SUPPORT_QR_URL": ""
+  }
 }

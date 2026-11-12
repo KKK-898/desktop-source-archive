@@ -3,42 +3,43 @@
 
 from __future__ import annotations
 
+import argparse
 import datetime
+import json
+import re
 import shutil
 import subprocess
 from pathlib import Path
 
 
-SOURCE = Path("/var/www/gaogeaii/updates")
-TARGETS = {
-    "com": Path("/var/www/gaogeaii/update-sites/gaogeaii-com"),
-    "cc": Path("/var/www/gaogeaii/update-sites/gaogeaii-cc"),
-}
-SITE_PATHS = {
-    "com": Path("/etc/nginx/sites-available/api.gaogeaii.com"),
-    "cc": Path("/etc/nginx/sites-available/api.gaogeaii.cc"),
-}
-
-COMMON_TAIL = r"""
-location ^~ /gaogeaii/codex-locales/ {
-    alias /var/www/gaogeaii/codex-locales/;
-    autoindex off;
-    try_files $uri =404;
-}
-
-location ^~ /gaogeaii/proxy/ {
-    alias /var/www/gaogeaii/proxy/;
-    autoindex off;
-    default_type text/yaml;
-    types { text/yaml yaml yml; }
-    add_header Cache-Control "no-store" always;
-    add_header X-Robots-Tag "noindex, nofollow, noarchive" always;
-    try_files $uri =404;
-}
-"""
+def load_configuration(path):
+    """All deployment locations come from an operator-owned JSON file."""
+    value = json.loads(Path(path).read_text(encoding="utf-8"))
+    required = ("source", "targets", "sites", "sharedSnippet", "backupRoot", "owner")
+    if not isinstance(value, dict) or any(key not in value for key in required):
+        raise ValueError("Configuration requires source, targets, sites, sharedSnippet, backupRoot and owner")
+    targets, sites = value["targets"], value["sites"]
+    if not isinstance(targets, dict) or not targets or not isinstance(sites, dict) or set(targets) != set(sites):
+        raise ValueError("targets and sites require the same nonempty mirror keys")
+    if any(not re.fullmatch(r"[a-zA-Z0-9_-]{1,40}", key) for key in targets):
+        raise ValueError("Mirror keys must be simple names")
+    for item in (value["source"], value["sharedSnippet"], value["backupRoot"], *targets.values(), *sites.values()):
+        if (not isinstance(item, str) or not re.fullmatch(r"/(?:[A-Za-z0-9_.-]+/)*[A-Za-z0-9_.-]+", item)
+                or any(part in (".", "..") for part in item.split("/"))):
+            raise ValueError("Deployment paths must be explicit, safe absolute Linux paths")
+    if not isinstance(value["owner"], str) or not re.fullmatch(r"[a-z_][a-z0-9_-]*:[a-z_][a-z0-9_-]*", value["owner"]):
+        raise ValueError("owner must be an explicit user:group")
+    source = Path(value["source"])
+    targets = {key: Path(item) for key, item in targets.items()}
+    sites = {key: Path(item) for key, item in sites.items()}
+    roots = [source, *targets.values()]
+    if any(left == right or left in right.parents or right in left.parents
+           for index, left in enumerate(roots) for right in roots[index + 1:]):
+        raise ValueError("Each target must be distinct from the source and other targets")
+    return source, targets, sites, Path(value["sharedSnippet"]), Path(value["backupRoot"]), value["owner"]
 
 
-def snippet(root: Path) -> str:
+def snippet(root: Path, common_tail: str) -> str:
     sections = []
     for platform in ("win", "mac", "linux", "themes"):
         sections.append(
@@ -50,22 +51,30 @@ def snippet(root: Path) -> str:
 }}
 """
         )
-    return "\n".join(sections) + COMMON_TAIL
+    return "\n".join(sections) + common_tail
 
 
 def main() -> None:
+    parser = argparse.ArgumentParser(description="Explicitly configured update mirror migration")
+    parser.add_argument("--config", required=True, help="Private deployment JSON; never include it in source releases")
+    args = parser.parse_args()
+    SOURCE, TARGETS, SITE_PATHS, shared_snippet, backup_root, owner = load_configuration(args.config)
     if not SOURCE.is_dir():
         raise SystemExit(f"Missing source update root: {SOURCE}")
     for path in SITE_PATHS.values():
         if not path.is_file():
             raise SystemExit(f"Missing Nginx site: {path}")
 
+    shared_original = shared_snippet.read_text(encoding="utf-8")
+    marker = "location ^~ /gaogeaii/codex-locales/"
+    if shared_original.count(marker) != 1:
+        raise ValueError("Expected one locale/proxy tail in the existing shared snippet")
+    common_tail = marker + shared_original.split(marker, 1)[1]
     timestamp = datetime.datetime.now(datetime.UTC).strftime("%Y%m%d%H%M%S")
-    backup = Path(f"/root/gaoge-release-nginx-backup-{timestamp}")
+    backup = backup_root / f"update-mirror-backup-{timestamp}"
     backup.mkdir(mode=0o700)
     for path in SITE_PATHS.values():
         shutil.copy2(path, backup / path.name)
-    shared_snippet = Path("/etc/nginx/snippets/gaogeaii-updates.conf")
     shutil.copy2(shared_snippet, backup / shared_snippet.name)
 
     for target in TARGETS.values():
@@ -74,10 +83,10 @@ def main() -> None:
 
     try:
         for key, root in TARGETS.items():
-            target_snippet = Path(f"/etc/nginx/snippets/gaogeaii-updates-{key}.conf")
-            target_snippet.write_text(snippet(root), encoding="utf-8")
-            old_include = "include /etc/nginx/snippets/gaogeaii-updates.conf;"
-            new_include = f"include /etc/nginx/snippets/gaogeaii-updates-{key}.conf;"
+            target_snippet = shared_snippet.with_name(f"{shared_snippet.stem}-{key}{shared_snippet.suffix}")
+            target_snippet.write_text(snippet(root, common_tail), encoding="utf-8")
+            old_include = f"include {shared_snippet};"
+            new_include = f"include {target_snippet};"
             site_text = SITE_PATHS[key].read_text(encoding="utf-8")
             if new_include in site_text:
                 continue
@@ -107,7 +116,8 @@ def main() -> None:
         subprocess.call(["systemctl", "reload", "nginx"])
         raise
 
-    subprocess.check_call(["chown", "-R", "www-data:www-data", "/var/www/gaogeaii/update-sites"])
+    for root in TARGETS.values():
+        subprocess.check_call(["chown", "-R", owner, str(root)])
     print(f"backup={backup}")
     for key, root in TARGETS.items():
         print(f"{key}={root}")

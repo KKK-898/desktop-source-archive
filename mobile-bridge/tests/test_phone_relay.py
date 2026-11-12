@@ -308,7 +308,7 @@ class PhoneRelayTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(response.status, 401)
         self.assertEqual(calls, [])
         controller = Controller(Path(self.temp.name) / 'account', config={})
-        with self.assertRaisesRegex(ValueError, '官方'):
+        with self.assertRaisesRegex(ValueError, '受信任'):
             controller.control({'action': 'register-account', 'url': 'https://evil.test/mobile',
                                 'accountToken': 'fixture-account-token', 'name': 'PC', 'consent': True})
 

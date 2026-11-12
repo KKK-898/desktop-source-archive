@@ -304,10 +304,13 @@ fn offline_status(app: &AppHandle) -> Value {
     status
 }
 
-const ACCOUNT_RELAY_URL: &str = "https://api.gaogeaii.com/mobile";
+// Account credentials may only be sent to the deployment's explicit trusted relay.
+const ACCOUNT_RELAY_URL: &str = match option_env!("GAOGE_ACCOUNT_RELAY_URL") {
+    Some(value) => value,
+    None => "",
+};
 
-fn validate_account_relay(relay_url: Option<&str>) -> Result<(), String> {
-    let raw = relay_url.unwrap_or_default().trim();
+fn parse_account_relay(raw: &str) -> Option<url::Url> {
     let authority = raw
         .split_once("://")
         .map(|(_, value)| {
@@ -317,24 +320,47 @@ fn validate_account_relay(relay_url: Option<&str>) -> Result<(), String> {
                 .unwrap_or_default()
         })
         .unwrap_or_default();
-    let parsed = url::Url::parse(raw).ok();
-    let trusted = parsed.as_ref().is_some_and(|url| {
-        !authority.contains('@')
-            && !raw.chars().any(char::is_control)
-            && url.scheme() == "https"
-            && url.host_str() == Some("api.gaogeaii.com")
-            && url.port_or_known_default() == Some(443)
-            && url.username().is_empty()
-            && url.password().is_none()
-            && url.query().is_none()
-            && url.fragment().is_none()
-            && matches!(url.path(), "/mobile" | "/mobile/")
+    let url = url::Url::parse(raw).ok()?;
+    if raw.trim() != raw
+        || raw.chars().any(char::is_control)
+        || raw.contains('\\')
+        || raw.contains('%')
+        || raw.split('/').any(|part| matches!(part, "." | ".."))
+        || authority.contains('@')
+        || url.scheme() != "https"
+        || url.host_str().is_none()
+        || url.host_str().is_some_and(|host| host.ends_with('.'))
+        || url.port_or_known_default() != Some(443)
+        || !url.username().is_empty()
+        || url.password().is_some()
+        || url.query().is_some()
+        || url.fragment().is_some()
+        || url.path().trim_end_matches('/').is_empty()
+    {
+        return None;
+    }
+    Some(url)
+}
+
+fn validate_account_relay_with_config(
+    relay_url: Option<&str>,
+    trusted_url: &str,
+) -> Result<(), String> {
+    let trusted = parse_account_relay(trusted_url)
+        .ok_or("未配置可信手机连接服务；自定义服务器请使用设备注册码")?;
+    let valid = relay_url.and_then(parse_account_relay).is_some_and(|url| {
+        url.origin() == trusted.origin()
+            && url.path().trim_end_matches('/') == trusted.path().trim_end_matches('/')
     });
-    if trusted {
+    if valid {
         Ok(())
     } else {
-        Err("软件账号只能用于官方手机连接服务；自定义服务器请使用设备注册码".into())
+        Err("软件账号只能用于配置的可信手机连接服务；自定义服务器请使用设备注册码".into())
     }
+}
+
+fn validate_account_relay(relay_url: Option<&str>) -> Result<(), String> {
+    validate_account_relay_with_config(relay_url, ACCOUNT_RELAY_URL)
 }
 
 impl Supervisor {
@@ -349,7 +375,9 @@ impl Supervisor {
             .arg("--data-dir")
             .arg(&directory)
             .env("PYTHONUNBUFFERED", "1")
-            .env("PYTHONUTF8", "1");
+            .env("PYTHONUTF8", "1")
+            // A user-supplied relay URL must never promote itself to a trusted account endpoint.
+            .env("GAOGE_ACCOUNT_RELAY_URL", ACCOUNT_RELAY_URL);
         let mut supervisor = Self::launch(command, secrets.clone())?;
         supervisor.request("init", json!({"relayConfig": secrets}), exiting)?;
         Ok(supervisor)
@@ -784,7 +812,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn first_use_defaults_to_official_relay_and_preserves_saved_custom_relay() {
+    fn first_use_defaults_to_configured_relay_and_preserves_saved_custom_relay() {
         let first = offline_settings_status(false, None);
         assert_eq!(first["relayUrl"], ACCOUNT_RELAY_URL);
         assert_eq!(first["state"], "stopped");
@@ -867,40 +895,55 @@ while ($null -ne ($line = [Console]::In.ReadLine())) {
     }
 
     #[test]
-    fn account_login_token_is_restricted_to_our_exact_https_relay() {
+    fn account_login_token_is_restricted_to_configured_exact_https_relay() {
+        let trusted = "https://api.example.invalid/mobile";
         for value in [
-            "https://api.gaogeaii.com/mobile",
-            "https://api.gaogeaii.com/mobile/",
-            "https://API.GAOGEAII.COM:443/mobile",
+            "https://api.example.invalid/mobile",
+            "https://api.example.invalid/mobile/",
+            "https://API.EXAMPLE.INVALID:443/mobile",
         ] {
-            assert!(validate_account_relay(Some(value)).is_ok(), "{value}");
+            assert!(
+                validate_account_relay_with_config(Some(value), trusted).is_ok(),
+                "{value}"
+            );
         }
         for value in [
-            "http://api.gaogeaii.com/mobile",
-            "https://api.gaogeaii.com.evil.test/mobile",
+            "http://api.example.invalid/mobile",
+            "https://api.example.invalid.evil.test/mobile",
             "https://evil.test/mobile",
-            "https://api.gaogeaii.com:8443/mobile",
-            "https://api.gaogeaii.com/other",
-            "https://api.gaogeaii.com/mobile/extra",
-            "https://api.gaogeaii.com/mobile?redirect=evil",
-            "https://api.gaogeaii.com/mobile#fragment",
-            "https://user@api.gaogeaii.com/mobile",
-            "https://@api.gaogeaii.com/mobile",
-            "https://user:secret@api.gaogeaii.com/mobile",
-            "https://api.gaogeaii.com/%6dobile",
-            "https://api.gaogeaii.com./mobile",
-            "https://api.gaogea\nii.com/mobile",
+            "https://api.example.invalid:8443/mobile",
+            "https://api.example.invalid/other",
+            "https://api.example.invalid/mobile/extra",
+            "https://api.example.invalid/mobile?redirect=evil",
+            "https://api.example.invalid/mobile#fragment",
+            "https://user@api.example.invalid/mobile",
+            "https://@api.example.invalid/mobile",
+            "https://user:secret@api.example.invalid/mobile",
+            "https://api.example.invalid/%6dobile",
+            "https://api.example.invalid/other/../mobile",
+            "https://api.example.invalid/mobile/.",
+            "https://api.example.invalid./mobile",
+            "https://api.exam\nple.invalid/mobile",
         ] {
-            assert!(validate_account_relay(Some(value)).is_err(), "{value}");
+            assert!(
+                validate_account_relay_with_config(Some(value), trusted).is_err(),
+                "{value}"
+            );
         }
-        assert!(validate_account_relay(None).is_err());
+        assert!(validate_account_relay_with_config(None, trusted).is_err());
+        assert!(validate_account_relay_with_config(Some(trusted), "").is_err());
+        assert!(validate_account_relay_with_config(
+            Some(trusted),
+            "http://api.example.invalid/mobile"
+        )
+        .is_err());
     }
 
     #[test]
     fn account_password_and_enrollment_tokens_are_never_persisted_as_registration() {
         let registration = registration_secrets(&json!({
             "deviceToken": "device", "deviceId": "id", "deviceName": "computer",
-            "url": ACCOUNT_RELAY_URL, "accountToken": "private-account",
+            "url": "https://api.example.invalid/mobile", "accountToken": "private-account",
             "password": "private-password", "enrollmentToken": "private-invite", "enabled": true
         }))
         .unwrap();

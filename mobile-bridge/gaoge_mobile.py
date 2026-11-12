@@ -10,11 +10,13 @@ from pathlib import Path
 
 from bridge.features.auth.auth import password_record
 from bridge.features.network.shared_relay import Controller, Connector
+from bridge.features.network.deployment import account_relay_url
 from bridge.features.notifications.channels import read_json, write_json
 from bridge.resources import project_root
 from relay.protocol import origin
 
-DEFAULT_RELAY = 'https://api.gaogeaii.com/mobile'
+# Kept as a source-compatible empty default; deployment settings are explicit.
+DEFAULT_RELAY = ''
 
 
 def self_check():
@@ -62,6 +64,7 @@ class MobileConnection:
         self.relay_config = {}
         self.secrets_dirty = False
         self.test_http = test_http
+        self.default_relay = account_relay_url(test_http)
         self.controller = Controller(self.directory, test_http=test_http,
                                      config=self.relay_config, save_hook=self.secrets_changed)
         self.gateway = self.bridge = self.notifications = self.connector = None
@@ -90,7 +93,8 @@ class MobileConnection:
             self.error = remote.get('error')
         running = self.gateway is not None
         registered = bool(self.relay_config.get('deviceToken'))
-        relay_url = self.relay_config.get('url') or self.settings.get('relayUrl', DEFAULT_RELAY)
+        relay_url = self.relay_config.get('url') or (self.settings.get('relayUrl') or self.default_relay)
+        relay_url = origin(relay_url, self.test_http) if relay_url else ''
         public_url = relay_url + '/d/' + self.relay_config['deviceId'] + '/' if registered else None
         result = {
             'relayConfigured': registered, 'runtimeAvailable': True,
@@ -120,16 +124,19 @@ class MobileConnection:
         auth = self.settings.get('auth', {})
         if not password and not auth.get('hash'):
             raise ValueError('首次使用请设置手机登录密码。')
-        relay_url = origin(request.get('relayUrl') or self.settings.get('relayUrl', DEFAULT_RELAY), self.test_http)
-        if self.relay_config.get('deviceToken') and self.relay_config['url'] != relay_url:
+        requested_relay = request.get('relayUrl') or self.settings.get('relayUrl') or self.default_relay
+        if not requested_relay:
+            raise ValueError('请先配置手机中继服务地址。')
+        relay_url = origin(requested_relay, self.test_http)
+        if self.relay_config.get('deviceToken') and origin(self.relay_config['url'], self.test_http) != relay_url:
             raise ValueError('这台电脑已接入另一手机服务，请先联系管理员迁移设备。')
         enrollment = request.get('enrollmentToken') or ''
         if enrollment and (not isinstance(enrollment, str) or len(enrollment) > 256):
             raise ValueError('设备接入码格式不正确。')
         account_token = request.get('accountToken') or ''
         if account_token and (not isinstance(account_token, str) or len(account_token) > 16384
-                              or relay_url != DEFAULT_RELAY):
-            raise ValueError('软件账号只能用于高哥官方手机连接服务。')
+                              or not self.default_relay or relay_url != self.default_relay):
+            raise ValueError('软件账号只能用于部署配置指定的受信任手机连接服务。')
         changed = bool(password) or username != auth.get('username')
         # Revoke before changing auth. If the server cannot confirm revocation,
         # leave the old credentials intact and do not silently retain grants.

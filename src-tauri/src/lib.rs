@@ -319,7 +319,11 @@ static CODEX_QQ2007_UPSTREAM_ASSETS_JSON: Lazy<String> = Lazy::new(|| {
     .unwrap_or_else(|_| "{}".to_string())
 });
 const CODEX_SESSION_HELPER_MAX_REQUEST_BYTES: usize = 1024 * 1024;
-const GAOGE_DEFAULT_API_BASE_URL: &str = "https://api.gaogeaii.com/api/v1";
+// Deployment metadata is supplied by the private build, never by the public source.
+const GAOGE_DEFAULT_API_BASE_URL: &str = match option_env!("GAOGE_DEFAULT_API_BASE_URL") {
+    Some(value) => value,
+    None => "",
+};
 const GAOGE_ACCOUNT_BALANCE_REQUEST_TIMEOUT_SECS: u64 = 8;
 const CODEX_AGGREGATE_ROUTER_MAX_REQUEST_BYTES: usize = 32 * 1024 * 1024;
 const CODEX_AGGREGATE_ROUTER_READ_TIMEOUT_SECS: u64 = 30;
@@ -6043,11 +6047,21 @@ fn load_gaoge_auth_session_for_balance() -> Result<Map<String, Value>, String> {
 }
 
 fn gaoge_auth_me_url(api_base_url: &str) -> Result<String, String> {
+    gaoge_auth_me_url_with_default(api_base_url, GAOGE_DEFAULT_API_BASE_URL)
+}
+
+fn gaoge_auth_me_url_with_default(
+    api_base_url: &str,
+    deployment_default: &str,
+) -> Result<String, String> {
     let candidate = if api_base_url.trim().is_empty() {
-        GAOGE_DEFAULT_API_BASE_URL
+        deployment_default.trim()
     } else {
         api_base_url.trim()
     };
+    if candidate.is_empty() {
+        return Err("登录会话未配置服务地址，请先选择服务线路并重新登录。".to_string());
+    }
     let mut parsed =
         url::Url::parse(candidate).map_err(|_| "Gaoge Free API 地址无效。".to_string())?;
     if !matches!(parsed.scheme(), "http" | "https") {
@@ -6104,7 +6118,7 @@ fn fetch_gaoge_account_balance() -> Result<Value, String> {
     let api_base_url = session
         .get("apiBaseUrl")
         .and_then(Value::as_str)
-        .unwrap_or(GAOGE_DEFAULT_API_BASE_URL);
+        .unwrap_or_default();
     let request_url = gaoge_auth_me_url(api_base_url)?;
     let client = reqwest::blocking::Client::builder()
         .connect_timeout(Duration::from_secs(5))
@@ -39477,14 +39491,33 @@ fast_mode = true
     }
 
     #[test]
-    fn gaoge_balance_helpers_normalize_endpoint_and_payload() {
+    fn balance_service_requires_explicit_session_or_deployment_config() {
+        let error = gaoge_auth_me_url_with_default("", "").unwrap_err();
+        assert!(error.contains("未配置服务地址"));
+        assert!(gaoge_auth_me_url_with_default(" ", " ").is_err());
         assert_eq!(
-            gaoge_auth_me_url("https://api.gaogeaii.com/api/v1").unwrap(),
-            "https://api.gaogeaii.com/api/v1/auth/me"
+            gaoge_auth_me_url_with_default("", "https://api.example.invalid/api/v1").unwrap(),
+            "https://api.example.invalid/api/v1/auth/me"
         );
         assert_eq!(
-            gaoge_auth_me_url("https://api.gaogeaii.com/api/v1/auth/me?stale=1").unwrap(),
-            "https://api.gaogeaii.com/api/v1/auth/me"
+            gaoge_auth_me_url_with_default(
+                "https://custom.example.invalid/api/v1",
+                "https://api.example.invalid/api/v1",
+            )
+            .unwrap(),
+            "https://custom.example.invalid/api/v1/auth/me"
+        );
+    }
+
+    #[test]
+    fn gaoge_balance_helpers_normalize_endpoint_and_payload() {
+        assert_eq!(
+            gaoge_auth_me_url("https://api.example.invalid/api/v1").unwrap(),
+            "https://api.example.invalid/api/v1/auth/me"
+        );
+        assert_eq!(
+            gaoge_auth_me_url("https://api.example.invalid/api/v1/auth/me?stale=1").unwrap(),
+            "https://api.example.invalid/api/v1/auth/me"
         );
         let (balance, frozen_balance) = gaoge_account_balance_from_payload(&json!({
             "code": 0,

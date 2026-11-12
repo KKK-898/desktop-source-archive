@@ -8,13 +8,13 @@ import os from 'node:os'
 import path from 'node:path'
 import { parseArguments, readSourceArchive, validateSnapshot, verifyPublicSource } from './verify-public-source.mjs'
 
-const REPOSITORY = 'KKK-898/Gaoge-Free-Desktop'
+const REPOSITORY = 'KKK-898/desktop-source-archive'
 const TAG = 'v1.7.1'
 const SOURCE_COMMIT = '1'.repeat(40)
 const SOURCE_TREE = '2'.repeat(40)
 const PUBLIC_COMMIT = '3'.repeat(40)
 const TAG_OBJECT = '4'.repeat(40)
-const ROOT = `Gaoge-Free-Desktop-${PUBLIC_COMMIT}`
+const ROOT = `desktop-source-archive-${PUBLIC_COMMIT}`
 const MANIFEST = 'SOURCE_MANIFEST.json'
 const REPORT = 'SOURCE_EXPORT_REPORT.json'
 const hash = (bytes) => createHash('sha256').update(bytes).digest('hex')
@@ -103,7 +103,7 @@ function fakeGitHub(archive, { publicRepo = true, annotated = false, changeTag =
     assert.equal(options.method, 'GET')
     assert.equal(Object.keys(options.headers).some((key) => /authorization|cookie/i.test(key)), false)
     if (status !== 200) return new Response('unavailable', { status })
-    if (url === base) return new Response(json({ name: 'Gaoge-Free-Desktop', full_name: REPOSITORY, private: !publicRepo, visibility: publicRepo ? 'public' : 'private' }))
+    if (url === base) return new Response(json({ name: 'desktop-source-archive', full_name: REPOSITORY, private: !publicRepo, visibility: publicRepo ? 'public' : 'private' }))
     if (url === `${base}/git/ref/tags/${tag}`) {
       refRequests += 1
       const sha = changeTag && refRequests > 1 ? '5'.repeat(40) : (annotated ? TAG_OBJECT : PUBLIC_COMMIT)
@@ -146,6 +146,10 @@ for (const status of [401, 403, 404, 500]) {
 }
 
 for (const [name, mutate, pattern] of [
+  ['development snapshot', (f) => patchJson(f, REPORT, (r) => { r.publicationKind = 'development-snapshot' }), /development snapshot/],
+  ['development manifest', (f) => patchJson(f, MANIFEST, (r) => { r.publicationKind = 'development-snapshot' }), /development snapshot/],
+  ['privacy maintenance report', (f) => patchJson(f, REPORT, (r) => { r.publicationKind = 'privacy-maintenance'; r.releaseReady = true }), /privacy maintenance snapshot/],
+  ['privacy maintenance manifest', (f) => patchJson(f, MANIFEST, (r) => { r.publicationKind = 'privacy-maintenance' }), /privacy maintenance snapshot/],
   ['releaseReady false', (f) => patchJson(f, REPORT, (r) => { r.releaseReady = false }), /not release-ready/],
   ['working-tree review', (f) => patchJson(f, REPORT, (r) => { r.sourceMode = 'working-tree' }), /not release-ready/],
   ['failed checks', (f) => patchJson(f, REPORT, (r) => { r.checks[0].ok = false }), /checks.*failing/],
@@ -646,8 +650,8 @@ test('the installed source and license links reference the immutable package rel
   const component = await readFile(new URL('../src/components/新版主题.vue', import.meta.url), 'utf8')
   assert.equal(metadata.version, '1.7.1')
   assert.equal(metadata.sourceReleaseTag, 'v1.7.1-build.2')
-  assert.ok(component.includes('const releaseSourceUrl = `https://github.com/KKK-898/Gaoge-Free-Desktop/tree/${packageMetadata.sourceReleaseTag}`'))
-  assert.ok(component.includes('const releaseLicenseUrl = `https://github.com/KKK-898/Gaoge-Free-Desktop/blob/${packageMetadata.sourceReleaseTag}/LICENSE`'))
+  assert.ok(component.includes('const releaseSourceUrl = `https://github.com/KKK-898/desktop-source-archive/tree/${packageMetadata.sourceReleaseTag}`'))
+  assert.ok(component.includes('const releaseLicenseUrl = `https://github.com/KKK-898/desktop-source-archive/blob/${packageMetadata.sourceReleaseTag}/LICENSE`'))
   assert.ok(!component.includes('/tree/v${packageMetadata.version}'))
   assert.ok(!component.includes('/blob/v${packageMetadata.version}/LICENSE'))
 })

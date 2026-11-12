@@ -213,6 +213,7 @@ import {
   type RuntimeServerView,
 } from '../domain-config'
 import { isGaogeCodexRelayBaseUrl } from '../codex-relay-url'
+import { desktopRegistrationEmailDomain, parseDeploymentContactItems, readFrontendDeploymentValue } from '../frontend-deployment'
 import {
   migrateCodexDefaultModelStorage,
   normalizeCodexModelSelectionOrigin,
@@ -241,14 +242,10 @@ import {
 import { lubanSmsCountries, type LubanSmsCountry } from '../sms-receiver-countries'
 import gaogeThemeLogo from '../assets/new-theme-gaoge-logo.png'
 import gaogeUserAvatarLogo from '../assets/gaoge-user-avatar-logo.png'
-import contactWechatQr from '../assets/contact-wechat-qr.png'
-import contactQqQr from '../assets/contact-qq-qr.png'
-import contactQqGroupQr from '../assets/contact-qq-group-qr.png'
 import codexLoginEntryImage from '../assets/tutorials/codex-login-entry.png'
 import codexLoginGroupsImage from '../assets/tutorials/codex-login-groups.png'
 import claudeLoginEntryImage from '../assets/tutorials/claude-login-entry.png'
 import claudeLoginActionImage from '../assets/tutorials/claude-login-action.png'
-import migrationSupportQrImage from '../assets/migration/support-qq-group-362905751.png'
 
 interface NavItem {
   title: string
@@ -1223,7 +1220,8 @@ const currentMigrationLinuxDownloadUrl = () => `${currentMigrationDownloadBaseUr
 const currentMigrationWebEntryUrl = () => getWebEntryUrl()
 const currentMigrationTutorialVideoBaseUrl = () => getTutorialVideoBaseUrl()
 const migrationWebEntryUrl = computed(() => currentMigrationWebEntryUrl())
-const MIGRATION_SUPPORT_GROUP = '362905751'
+const MIGRATION_SUPPORT_GROUP = readFrontendDeploymentValue('VITE_GAOGE_SUPPORT_GROUP')
+const migrationSupportQrImage = readFrontendDeploymentValue('VITE_GAOGE_SUPPORT_QR_URL')
 
 const invoiceTypeLabel = '信息技术服务'
 const invoiceKindLabel = '普通发票'
@@ -1355,32 +1353,9 @@ const image2ComplexityOptions: Array<{ value: ImageComplexity; label: string }> 
 ]
 const image2CountOptions = [1, 2, 3, 4]
 const feedbackTypeOptions = ['功能建议', '使用问题', '报错反馈', '订阅 / 发票', '其他']
-const fallbackContactItems: ContactItemView[] = [
-  {
-    id: 'contact-wechat-qr',
-    label: '添加微信',
-    value: '微信二维码',
-    detail: '扫码添加客服微信',
-    imageUrl: contactWechatQr,
-    icon: MessageSquareText,
-  },
-  {
-    id: 'contact-qq-qr',
-    label: '添加QQ',
-    value: 'QQ二维码',
-    detail: '扫码添加客服 QQ',
-    imageUrl: contactQqQr,
-    icon: MessageSquareText,
-  },
-  {
-    id: 'contact-qq-group-qr',
-    label: '添加QQ群',
-    value: 'QQ群二维码',
-    detail: '扫码加入售后交流群，群号：362905751',
-    imageUrl: contactQqGroupQr,
-    icon: MessageSquareText,
-  },
-]
+const fallbackContactItems: ContactItemView[] = parseDeploymentContactItems(
+  readFrontendDeploymentValue('VITE_GAOGE_CONTACT_ITEMS'),
+).map(normalizeDesktopContactItem).filter((item): item is ContactItemView => Boolean(item))
 
 const hasTauriRuntime = () => (
   typeof window !== 'undefined' &&
@@ -4052,8 +4027,8 @@ const projectOutsourcingApprovedCount = computed(() => visibleProjectOutsourcing
 const projectOutsourcingRejectedCount = computed(() => visibleProjectOutsourcingRecords.value.filter((item) => item.status === 'rejected').length)
 const updateVersionText = computed(() => updateStatus.value.version || packageMetadata.version)
 // Link the installed build to its exact corresponding source, not the moving main branch.
-const releaseSourceUrl = `https://github.com/KKK-898/Gaoge-Free-Desktop/tree/${packageMetadata.sourceReleaseTag}`
-const releaseLicenseUrl = `https://github.com/KKK-898/Gaoge-Free-Desktop/blob/${packageMetadata.sourceReleaseTag}/LICENSE`
+const releaseSourceUrl = `https://github.com/KKK-898/desktop-source-archive/tree/${packageMetadata.sourceReleaseTag}`
+const releaseLicenseUrl = `https://github.com/KKK-898/desktop-source-archive/blob/${packageMetadata.sourceReleaseTag}/LICENSE`
 const updateButtonText = computed(() => {
   if (updateStatus.value.state === 'restarting') return '正在重启...'
   if (updateStatus.value.downloaded) return '立即安装'
@@ -4532,7 +4507,8 @@ function closeLoginContactDialog() {
 }
 
 function buildSoftwareInvitationUrl(token: string) {
-  const softwareOrigin = String(getSoftwareOrigin() || 'https://ruanjian.gaogeaii.com').trim()
+  const softwareOrigin = String(getSoftwareOrigin() || '').trim()
+  if (!softwareOrigin) throw new Error('未配置软件分享地址，请先选择服务线路。')
   const invitationUrl = new URL('/invite', softwareOrigin)
   invitationUrl.searchParams.set('t', token)
   return invitationUrl.toString()
@@ -4542,7 +4518,8 @@ async function loadSoftwareShareUrl() {
   softwareShareUrl.value = ''
   softwareShareError.value = ''
   if (invitationPreviewMode) {
-    softwareShareUrl.value = buildSoftwareInvitationUrl('preview-signed-invitation-token')
+    try { softwareShareUrl.value = buildSoftwareInvitationUrl('preview-signed-invitation-token') }
+    catch (error) { softwareShareError.value = getErrorMessage(error) }
     return
   }
   if (!authToken.value) {
@@ -5467,7 +5444,7 @@ function createDesktopAccountCredentials() {
   const stamp = Date.now().toString(36)
   const suffix = getRandomText(10)
   return {
-    email: `desk-${stamp}-${suffix}@desktop.gaogeai.cloud`,
+    email: `desk-${stamp}-${suffix}@${desktopRegistrationEmailDomain(readFrontendDeploymentValue('VITE_GAOGE_DESKTOP_EMAIL_DOMAIN'))}`,
     password: DESKTOP_INITIAL_PASSWORD,
   }
 }
@@ -14806,8 +14783,8 @@ function showCodexManualInstallDialog() {
     tone: 'info',
     title: 'Codex 安装包下载',
     details: [
-      '请添加售后 QQ 群，从 QQ 群文件内下载 Codex 安装包。',
-      'QQ群：362905751',
+      '请从官方渠道或当前服务提供方获取 Codex 安装包。',
+      ...(MIGRATION_SUPPORT_GROUP ? [`支持群：${MIGRATION_SUPPORT_GROUP}`] : []),
     ],
     confirmText: '知道了',
     cancelText: '',
@@ -17038,10 +17015,10 @@ void [
             <Headphones :size="16" />
             售后支持
           </span>
-          <strong>遇到问题进售后群联系处理</strong>
-          <p>安装、登录、账号切换或教程操作遇到问题，都可以加入售后 QQ 群联系处理。</p>
+          <strong>{{ MIGRATION_SUPPORT_GROUP || migrationSupportQrCode ? '遇到问题联系当前服务提供方' : '请参考使用教程或联系服务提供方' }}</strong>
+          <p>安装、登录、账号切换或教程操作遇到问题，请参考教程；支持方式由当前服务提供方配置。</p>
         </div>
-        <div class="migration-support-card">
+        <div v-if="MIGRATION_SUPPORT_GROUP || migrationSupportQrCode" class="migration-support-card">
           <img v-if="migrationSupportQrCode" :src="migrationSupportQrCode" alt="售后 QQ 群二维码" />
           <div v-else class="migration-qr-fallback">QQ群</div>
           <div>
@@ -21699,16 +21676,17 @@ void [
             联系我们
           </span>
           <h2 id="new-theme-login-contact-title">扫码联系 Gaoge Free</h2>
-          <p>登录不上或后台连接异常时，也可以直接查看这些本地内置联系方式。</p>
+          <p>联系方式由当前服务提供方配置；未配置时不会显示任何预置联系方式。</p>
         </div>
         <button type="button" aria-label="关闭" @click="closeLoginContactDialog">
           <X :size="18" />
         </button>
       </header>
 
+      <p v-if="contactItems.length === 0">当前服务暂未配置联系方式。</p>
       <div class="new-theme-login-contact-grid">
         <button
-          v-for="item in fallbackContactItems"
+          v-for="item in contactItems"
           :key="item.id"
           class="new-theme-login-contact-card"
           type="button"

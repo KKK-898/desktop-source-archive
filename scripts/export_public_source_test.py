@@ -313,6 +313,42 @@ class PublicSourceExportTests(unittest.TestCase):
         paths["src-tauri/tauri.conf.json"] = mod.json_bytes({"version": "1.7.1", "bundle": {"resources": ["../missing.pak"]}})
         self.assertTrue(self.failed(paths, "tauri_resources_or_locked_dependencies"))
 
+    def test_operator_endpoints_are_rejected_without_reporting_values(self):
+        paths = self.minimal()
+        domain = "api." + "gaogeaii" + ".com"
+        paths["src/endpoint.ts"] = ('export const url = "https://' + domain + '/v1"').encode()
+        findings = mod.operator_deployment_issues(paths)
+        self.assertEqual(findings, ["src/endpoint.ts -> operator production domain"])
+        self.assertNotIn(domain, " ".join(findings))
+        _, checks, _, _ = mod.inspect(paths, [])
+        self.assertFalse(next(x for x in checks if x["name"] == "operator_deployment_information")["ok"])
+
+    def test_operator_contact_assets_block_even_when_unreferenced(self):
+        for filename in ("contact-wechat-qr.png", "contact-qq-qr.png", "contact-qq-group-qr.png"):
+            paths = self.minimal()
+            paths["src/assets/" + filename] = b"\x89PNG\x00\xff"
+            self.assertTrue(mod.operator_deployment_issues(paths))
+
+    def test_generic_and_license_endpoints_remain_valid(self):
+        paths = {"src/config.ts": b'const example = "https://relay.example.invalid/v1";',
+                 "NOTICE.md": b'https://www.gnu.org/licenses/agpl-3.0.en.html',
+                 "README.md": b'https://github.com/example/desktop-source-archive'}
+        self.assertEqual(mod.operator_deployment_issues(paths), [])
+
+    def test_operator_privacy_failure_writes_no_review_output(self):
+        paths = self.minimal()
+        paths["src/endpoint.ts"] = ('const url = "https://api.' + "gaogeaii" + '.com/v1"').encode()
+        with tempfile.TemporaryDirectory() as temporary:
+            output = Path(temporary) / "review"
+            modes = {name: 0o644 for name in paths}
+            for target, source in mod.REPLACEMENTS.items():
+                paths[source] = b"generic build instructions"
+                modes[source] = 0o644
+            with mock.patch.object(mod, "read_source", return_value=(paths, [], [], modes, "a" * 40, "b" * 40)):
+                with self.assertRaises(ValueError):
+                    mod.export(Path(temporary), output, working_tree=True, review_only=True)
+            self.assertFalse(output.exists())
+
     def test_secret_pattern_detected(self):
         paths = self.minimal()
         paths["src/test.ts"] = ("ghp_" + "A" * 36).encode()
@@ -355,6 +391,266 @@ class PublicSourceExportTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temp:
             with self.assertRaisesRegex(ValueError, "WorkingTree requires ReviewOnly"):
                 mod.export(temp, Path(temp) / "output", working_tree=True)
+
+    def test_development_snapshot_requires_immutable_commit_and_exclusive_mode(self):
+        cases = [dict(ref="HEAD"), dict(ref="main"), dict(ref="a" * 40, working_tree=True),
+                 dict(ref="a" * 40, review_only=True)]
+        for options in cases:
+            with self.subTest(options=options), tempfile.TemporaryDirectory() as temp:
+                output = Path(temp) / "development"
+                with mock.patch.object(mod, "read_source") as reader:
+                    with self.assertRaisesRegex(ValueError, "DevelopmentSnapshot"):
+                        mod.export(temp, output, development_snapshot=True, **options)
+                    reader.assert_not_called()
+                self.assertFalse(output.exists())
+
+    def test_development_snapshot_is_explicitly_unreleased_and_not_release_ready(self):
+        paths = self.minimal()
+        for source in mod.REPLACEMENTS.values():
+            paths[source] = b"Synthetic public build documentation"
+        original_package = paths["package.json"]
+        with tempfile.TemporaryDirectory() as temp:
+            with mock.patch.object(mod, "read_source", return_value=(paths, [], [], {}, "a" * 40, "b" * 40)):
+                result = mod.export(temp, Path(temp) / "development", ref="a" * 40, development_snapshot=True)
+            report = json.loads(Path(result["ReportPath"]).read_bytes())
+            manifest = json.loads(Path(result["ManifestPath"]).read_bytes())
+            self.assertFalse(result["ReleaseReady"])
+            self.assertFalse(report["releaseReady"])
+            self.assertEqual(report["publicationKind"], "development-snapshot")
+            self.assertEqual(manifest["publicationKind"], "development-snapshot")
+            self.assertEqual(report["sourceMode"], "git-ref")
+            self.assertEqual(report["version"], "1.7.1")
+            self.assertIn("Not the corresponding source", report["sourceStatus"])
+            exported = Path(result["SourceDirectory"])
+            self.assertEqual((exported / "package.json").read_bytes(), original_package)
+            self.assertIn("Unreleased development snapshot", (exported / "DEVELOPMENT_SNAPSHOT.md").read_text())
+            self.assertTrue(any(x["path"] == "DEVELOPMENT_SNAPSHOT.md" for x in manifest["files"]))
+            self.assertEqual([x["name"] for x in report["checks"] if not x["ok"]], ["publication_mode"])
+
+    def test_development_snapshot_rejects_resolved_revision_mismatch(self):
+        with tempfile.TemporaryDirectory() as temp:
+            with mock.patch.object(mod, "read_source", return_value=({}, [], [], {}, "b" * 40, "c" * 40)):
+                with self.assertRaisesRegex(ValueError, "differs"):
+                    mod.export(temp, Path(temp) / "development", ref="a" * 40, development_snapshot=True)
+
+    def test_development_snapshot_does_not_reuse_historical_rights_decision(self):
+        paths, target, evidence_hash = self.owner_decision_fixture()
+        for source in mod.REPLACEMENTS.values():
+            paths[source] = b"Synthetic public build documentation"
+        with tempfile.TemporaryDirectory() as temp:
+            output = Path(temp) / "development"
+            with mock.patch.object(mod, "OWNER_RELEASE_SCOPE_COUNT", 1), mock.patch.object(mod, "OWNER_RELEASE_EVIDENCE_SHA256", evidence_hash):
+                with mock.patch.object(mod, "read_source", return_value=(paths, [], [], {}, "a" * 40, "b" * 40)):
+                    with self.assertRaisesRegex(ValueError, "development_snapshot_rights"):
+                        mod.export(temp, output, ref="a" * 40, development_snapshot=True)
+            self.assertFalse(output.exists())
+            self.assertEqual(len(mod.development_snapshot_rights_issues([{"path": target}])), 1)
+
+    def test_development_snapshot_keeps_privacy_completeness_and_rights_gates(self):
+        for case in ("operator-domain", "missing-source", "unreviewed-art", "secret"):
+            paths = self.minimal()
+            for source in mod.REPLACEMENTS.values():
+                paths[source] = b"Synthetic public build documentation"
+            if case == "operator-domain": paths["src/endpoint.ts"] = ("https://api." + "gaogeaii" + ".com/v1").encode()
+            elif case == "missing-source": del paths["src-tauri/src/lib.rs"]
+            elif case == "unreviewed-art": paths["theme-resources/sources/example.png"] = b"unreviewed"
+            else: paths["src/secret.ts"] = ("ghp_" + "A" * 36).encode()
+            with self.subTest(case=case), tempfile.TemporaryDirectory() as temp:
+                output = Path(temp) / "development"
+                with mock.patch.object(mod, "read_source", return_value=(paths, [], [], {}, "a" * 40, "b" * 40)):
+                    with self.assertRaisesRegex(ValueError, "export blocked"):
+                        mod.export(temp, output, ref="a" * 40, development_snapshot=True)
+                self.assertFalse(output.exists())
+
+
+    def privacy_fixture(self, temporary):
+        paths, target, evidence_hash = self.owner_decision_fixture()
+        for source in mod.REPLACEMENTS.values():
+            paths[source] = b"Synthetic public build documentation"
+        baseline = Path(temporary) / "baseline"
+        with mock.patch.object(mod, "OWNER_RELEASE_SCOPE_COUNT", 1), mock.patch.object(mod, "OWNER_RELEASE_EVIDENCE_SHA256", evidence_hash):
+            with mock.patch.object(mod, "read_source", return_value=(dict(paths), [], [], {}, "a" * 40, "b" * 40)):
+                mod.export(temporary, baseline)
+        files = {p.relative_to(baseline).as_posix(): p.read_bytes() for p in baseline.rglob("*") if p.is_file()}
+        disclosures = json.loads(files["SOURCE_EXPORT_REPORT.json"])["rightsDisclosures"]
+        return paths, target, evidence_hash, baseline, files, disclosures
+
+    @contextlib.contextmanager
+    def privacy_pins(self, evidence_hash, files):
+        with mock.patch.object(mod, "OWNER_RELEASE_SCOPE_COUNT", 1), mock.patch.object(mod, "OWNER_RELEASE_EVIDENCE_SHA256", evidence_hash):
+            with mock.patch.object(mod, "PRIVACY_BASELINE_PUBLIC_TREE", mod.snapshot_git_tree(files)):
+                yield
+
+    def test_privacy_baseline_identity_is_explicit_and_fixed(self):
+        self.assertEqual(mod.OWNER_RELEASE_SCOPE_COUNT, 50)
+        self.assertEqual(mod.OWNER_RELEASE_VERSION, "1.7.1")
+        self.assertEqual(mod.PRIVACY_BASELINE_REPOSITORY, "KKK-898/desktop-source-archive")
+        self.assertEqual(mod.PRIVACY_BASELINE_COMMIT, "51a064abd7337920435ee5939c00ba83a9277f06")
+        self.assertEqual(mod.PRIVACY_BASELINE_PUBLIC_TREE, "c66afb8d71fc36372cd644d36fffb310b82f8de6")
+
+    def test_snapshot_git_tree_matches_git_for_nested_and_non_ascii_paths(self):
+        paths = {"a/b.txt": b"nested\n", "a.c": b"file\n", "aa/z": b"\0binary", "z": b"last", "unicode/\u00e9.txt": b"accent"}
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            for name, data in paths.items():
+                (root / name).parent.mkdir(parents=True, exist_ok=True)
+                (root / name).write_bytes(data)
+            subprocess.run(["git", "init", "-q", str(root)], check=True)
+            subprocess.run(["git", "-C", str(root), "config", "core.autocrlf", "false"], check=True)
+            subprocess.run(["git", "-C", str(root), "add", "."], check=True)
+            expected = subprocess.check_output(["git", "-C", str(root), "write-tree"], text=True).strip()
+            self.assertEqual(mod.snapshot_git_tree(paths), expected)
+        for paths in ({"a": b"", "a/b": b""}, {"A": b"", "a": b""}, {"../bad": b""}):
+            with self.assertRaisesRegex(ValueError, "snapshot tree paths"):
+                mod.snapshot_git_tree(paths)
+
+    def test_privacy_maintenance_requires_baseline_immutable_commit_and_exclusive_mode(self):
+        cases = [dict(ref="HEAD"), dict(ref="main"), dict(ref="a" * 40, working_tree=True),
+                 dict(ref="a" * 40, review_only=True), dict(ref="a" * 40, development_snapshot=True),
+                 dict(ref="a" * 40, privacy_maintenance_baseline_path=""),
+                 dict(ref="a" * 40, privacy_maintenance_baseline_path="  ")]
+        for options in cases:
+            arguments = {"privacy_maintenance_baseline_path": "baseline", **options}
+            with self.subTest(options=options), tempfile.TemporaryDirectory() as temporary:
+                output = Path(temporary) / "out"
+                with mock.patch.object(mod, "read_source") as reader:
+                    with self.assertRaisesRegex(ValueError, "PrivacyMaintenance"):
+                        mod.export(temporary, output, **arguments)
+                    reader.assert_not_called()
+                self.assertFalse(output.exists())
+        with tempfile.TemporaryDirectory() as temporary:
+            with mock.patch.object(mod, "read_source", return_value=({}, [], [], {}, "b" * 40, "c" * 40)):
+                with self.assertRaisesRegex(ValueError, "differs"):
+                    mod.export(temporary, Path(temporary) / "out", ref="a" * 40, privacy_maintenance_baseline_path="baseline")
+
+    def test_privacy_maintenance_is_unreleased_and_preserves_historical_disclosures(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            paths, target, evidence_hash, baseline, files, disclosures = self.privacy_fixture(temporary)
+            original_package = paths["package.json"]
+            with self.privacy_pins(evidence_hash, files):
+                with mock.patch.object(mod, "read_source", return_value=(dict(paths), [], [], {}, "c" * 40, "d" * 40)):
+                    result = mod.export(temporary, Path(temporary) / "out", ref="c" * 40, privacy_maintenance_baseline_path=baseline)
+            output = Path(result["SourceDirectory"])
+            report = json.loads(Path(result["ReportPath"]).read_bytes())
+            manifest = json.loads(Path(result["ManifestPath"]).read_bytes())
+            self.assertFalse(result["ReleaseReady"])
+            self.assertFalse(report["releaseReady"])
+            self.assertEqual(result["PublicationKind"], "privacy-maintenance")
+            self.assertEqual(report["publicationKind"], manifest["publicationKind"])
+            self.assertEqual(report["publicationKind"], "privacy-maintenance")
+            self.assertEqual(report["maintenanceBaseline"], manifest["maintenanceBaseline"])
+            self.assertEqual(report["maintenanceBaseline"]["publicCommit"], mod.PRIVACY_BASELINE_COMMIT)
+            self.assertEqual(report["maintenanceBaseline"]["publicTree"], mod.snapshot_git_tree(files))
+            self.assertEqual(report["rightsDisclosures"], disclosures)
+            self.assertEqual(report["version"], "1.7.1")
+            self.assertEqual(report["sourceMode"], "git-ref")
+            self.assertIn("not a new version", report["sourceStatus"])
+            self.assertEqual((output / "package.json").read_bytes(), original_package)
+            self.assertEqual((output / target).read_bytes(), files[target])
+            self.assertEqual((output / mod.OWNER_RELEASE_EVIDENCE_PATH).read_bytes(), files[mod.OWNER_RELEASE_EVIDENCE_PATH])
+            self.assertIn("not a new rights license or legal clearance", (output / "PRIVACY_MAINTENANCE.md").read_text())
+            self.assertTrue(any(item["path"] == "PRIVACY_MAINTENANCE.md" for item in manifest["files"]))
+            self.assertEqual([item["name"] for item in report["checks"] if not item["ok"]], ["publication_mode"])
+
+    def test_privacy_baseline_rejects_arbitrary_directory_before_self_reported_metadata(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            paths, target, evidence_hash, baseline, files, disclosures = self.privacy_fixture(temporary)
+            with mock.patch.object(mod, "OWNER_RELEASE_SCOPE_COUNT", 1), mock.patch.object(mod, "OWNER_RELEASE_EVIDENCE_SHA256", evidence_hash):
+                with self.assertRaisesRegex(ValueError, "public Git tree"):
+                    mod.privacy_maintenance_baseline(baseline, paths, "1.7.1", disclosures)
+            with self.privacy_pins(evidence_hash, files):
+                (baseline / target).write_bytes(b"tampered baseline")
+                with self.assertRaisesRegex(ValueError, "public Git tree"):
+                    mod.privacy_maintenance_baseline(baseline, paths, "1.7.1", disclosures)
+
+    def test_privacy_baseline_rejects_extra_files_directories_and_missing_paths(self):
+        for case in ("extra-file", "empty-directory", "missing-file", "missing-root", "file-root"):
+            with self.subTest(case=case), tempfile.TemporaryDirectory() as temporary:
+                paths, target, evidence_hash, baseline, files, disclosures = self.privacy_fixture(temporary)
+                with self.privacy_pins(evidence_hash, files):
+                    if case == "extra-file": (baseline / "unexpected.txt").write_bytes(b"extra")
+                    elif case == "empty-directory": (baseline / "empty-directory").mkdir()
+                    elif case == "missing-file": (baseline / target).unlink()
+                    elif case == "missing-root": baseline = Path(temporary) / "does-not-exist"
+                    else: baseline = baseline / "package.json"
+                    with self.assertRaises(ValueError):
+                        mod.privacy_maintenance_baseline(baseline, paths, "1.7.1", disclosures)
+
+    def test_privacy_baseline_rejects_symlinks(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            paths, target, evidence_hash, baseline, files, disclosures = self.privacy_fixture(temporary)
+            try:
+                (baseline / "symlink.txt").symlink_to(baseline / "package.json")
+            except (OSError, NotImplementedError):
+                self.skipTest("Creating symlinks is not enabled on this host")
+            with self.privacy_pins(evidence_hash, files):
+                with self.assertRaisesRegex(ValueError, "symlinks/junctions forbidden"):
+                    mod.privacy_maintenance_baseline(baseline, paths, "1.7.1", disclosures)
+
+    def test_privacy_baseline_metadata_is_checked_beyond_public_tree_pin(self):
+        cases = ("manifest-hash", "manifest-size", "manifest-duplicate", "manifest-path", "digest", "schema", "source-id", "source-id-type",
+                 "mismatched-source", "kind", "not-ready", "mode", "checks", "findings", "unlisted-file", "invalid-json", "array-metadata")
+        for case in cases:
+            with self.subTest(case=case), tempfile.TemporaryDirectory() as temporary:
+                paths, target, evidence_hash, baseline, files, disclosures = self.privacy_fixture(temporary)
+                manifest = json.loads(files["SOURCE_MANIFEST.json"])
+                report = json.loads(files["SOURCE_EXPORT_REPORT.json"])
+                if case == "manifest-hash": manifest["files"][0]["sha256"] = "0" * 64
+                elif case == "manifest-size": manifest["files"][0]["size"] += 1
+                elif case == "manifest-duplicate": manifest["files"].append(manifest["files"][0])
+                elif case == "manifest-path": manifest["files"][0]["path"] = 123
+                elif case == "digest": report["filesDigest"] = "0" * 64
+                elif case == "schema": report["schemaVersion"] = 2
+                elif case == "source-id": report["sourceCommit"] = "not-a-hash"
+                elif case == "source-id-type": report["sourceCommit"] = None
+                elif case == "mismatched-source": report["sourceCommit"] = "d" * 40
+                elif case == "kind": report["publicationKind"] = "privacy-maintenance"
+                elif case == "not-ready": report["releaseReady"] = False
+                elif case == "mode": report["sourceMode"] = "working-tree"
+                elif case == "checks": report["checks"][0]["ok"] = False
+                elif case == "findings": report["rightsFindings"] = [{"path": target}]
+                elif case == "unlisted-file": files["unlisted.txt"] = b"extra"
+                elif case == "array-metadata": report = []
+                files["SOURCE_MANIFEST.json"] = mod.json_bytes(manifest)
+                files["SOURCE_EXPORT_REPORT.json"] = b"{invalid" if case == "invalid-json" else mod.json_bytes(report)
+                for name, data in files.items(): (baseline / name).write_bytes(data)
+                # Re-pin this synthetic fixture to reach the independent metadata checks.
+                with self.privacy_pins(evidence_hash, files):
+                    with self.assertRaises(ValueError):
+                        mod.privacy_maintenance_baseline(baseline, paths, "1.7.1", disclosures)
+
+    def test_privacy_maintenance_does_not_extend_rights_scope_or_change_preserved_bytes(self):
+        cases = ("next-version", "missing-disclosure", "changed-disclosure", "duplicate-disclosure", "asset", "audit", "evidence", "license", "notice", "provenance")
+        for case in cases:
+            with self.subTest(case=case), tempfile.TemporaryDirectory() as temporary:
+                paths, target, evidence_hash, baseline, files, disclosures = self.privacy_fixture(temporary)
+                version = "1.7.1"
+                if case == "next-version": version = "1.7.2"
+                elif case == "missing-disclosure": disclosures.clear()
+                elif case == "changed-disclosure": disclosures[0]["reason"] = "changed"
+                elif case == "duplicate-disclosure": disclosures.append(disclosures[0])
+                else:
+                    name = {"asset": target, "audit": "scripts/public-source-audit.json", "evidence": mod.OWNER_RELEASE_EVIDENCE_PATH,
+                            "license": "LICENSE", "notice": "NOTICE.md", "provenance": "theme-resources/licenses/synthetic.md"}[case]
+                    paths[name] += b"changed"
+                with self.privacy_pins(evidence_hash, files):
+                    with self.assertRaisesRegex(ValueError, "PrivacyMaintenance baseline blocked"):
+                        mod.privacy_maintenance_baseline(baseline, paths, version, disclosures)
+
+    def test_privacy_maintenance_keeps_privacy_completeness_and_rights_gates(self):
+        for case in ("operator-domain", "missing-source", "unreviewed-art", "secret"):
+            with self.subTest(case=case), tempfile.TemporaryDirectory() as temporary:
+                paths, target, evidence_hash, baseline, files, disclosures = self.privacy_fixture(temporary)
+                if case == "operator-domain": paths["src/endpoint.ts"] = ("https://api." + "gaogeaii" + ".com/v1").encode()
+                elif case == "missing-source": del paths["src-tauri/src/lib.rs"]
+                elif case == "unreviewed-art": paths["theme-resources/sources/example.png"] = b"unreviewed"
+                else: paths["src/secret.ts"] = ("ghp_" + "A" * 36).encode()
+                output = Path(temporary) / "out"
+                with self.privacy_pins(evidence_hash, files):
+                    with mock.patch.object(mod, "read_source", return_value=(paths, [], [], {}, "c" * 40, "d" * 40)):
+                        with self.assertRaisesRegex(ValueError, "export blocked"):
+                            mod.export(temporary, output, ref="c" * 40, privacy_maintenance_baseline_path=baseline)
+                self.assertFalse(output.exists())
 
     def test_existing_directory_never_overwritten(self):
         with tempfile.TemporaryDirectory() as temp:

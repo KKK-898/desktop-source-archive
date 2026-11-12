@@ -19,6 +19,15 @@ jobs:
     timeout-minutes: 75
     env:
       MACOSX_DEPLOYMENT_TARGET: '11.0'
+      GAOGE_DEFAULT_API_BASE_URL: ${{ vars.GAOGE_DEFAULT_API_BASE_URL }}
+      GAOGE_ACCOUNT_RELAY_URL: ${{ vars.GAOGE_ACCOUNT_RELAY_URL }}
+      GAOGE_MOBILE_COMPONENT_MANIFEST_URL: ${{ vars.GAOGE_MOBILE_COMPONENT_MANIFEST_URL }}
+      VITE_GAOGE_CODEX_RELAY_ORIGINS: ${{ vars.VITE_GAOGE_CODEX_RELAY_ORIGINS }}
+      VITE_GAOGE_MOBILE_RELAY_URL: ${{ vars.VITE_GAOGE_MOBILE_RELAY_URL }}
+      VITE_GAOGE_CONTACT_ITEMS: ${{ vars.VITE_GAOGE_CONTACT_ITEMS }}
+      VITE_GAOGE_DESKTOP_EMAIL_DOMAIN: ${{ vars.VITE_GAOGE_DESKTOP_EMAIL_DOMAIN }}
+      VITE_GAOGE_SUPPORT_GROUP: ${{ vars.VITE_GAOGE_SUPPORT_GROUP }}
+      VITE_GAOGE_SUPPORT_QR_URL: ${{ vars.VITE_GAOGE_SUPPORT_QR_URL }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -39,7 +48,7 @@ jobs:
         run: cargo test --locked --manifest-path src-tauri/Cargo.toml --lib mobile_component::tests::official_download_isolated_and_offline_reuse -- --ignored --exact --nocapture --test-threads=1
       - name: Build universal Mac test application and installer
         env:
-          VITE_GAOGE_BOOTSTRAP_CONFIG_URLS: 'https://gaoge-desktop-config.oss-cn-shanghai.aliyuncs.com/desktop-server-directory.json'
+          VITE_GAOGE_BOOTSTRAP_CONFIG_URLS: ${{ vars.VITE_GAOGE_BOOTSTRAP_CONFIG_URLS }}
         run: npx tauri build --target universal-apple-darwin --bundles app,dmg --ci --config src-tauri/tauri.mobile-test.conf.json
       - name: Verify lightweight application, signature and installer
         run: python scripts/verify-mac-mobile-test.py
@@ -56,6 +65,15 @@ jobs:
     timeout-minutes: 35
     env:
       MACOSX_DEPLOYMENT_TARGET: '11.0'
+      GAOGE_DEFAULT_API_BASE_URL: ${{ vars.GAOGE_DEFAULT_API_BASE_URL }}
+      GAOGE_ACCOUNT_RELAY_URL: ${{ vars.GAOGE_ACCOUNT_RELAY_URL }}
+      GAOGE_MOBILE_COMPONENT_MANIFEST_URL: ${{ vars.GAOGE_MOBILE_COMPONENT_MANIFEST_URL }}
+      VITE_GAOGE_CODEX_RELAY_ORIGINS: ${{ vars.VITE_GAOGE_CODEX_RELAY_ORIGINS }}
+      VITE_GAOGE_MOBILE_RELAY_URL: ${{ vars.VITE_GAOGE_MOBILE_RELAY_URL }}
+      VITE_GAOGE_CONTACT_ITEMS: ${{ vars.VITE_GAOGE_CONTACT_ITEMS }}
+      VITE_GAOGE_DESKTOP_EMAIL_DOMAIN: ${{ vars.VITE_GAOGE_DESKTOP_EMAIL_DOMAIN }}
+      VITE_GAOGE_SUPPORT_GROUP: ${{ vars.VITE_GAOGE_SUPPORT_GROUP }}
+      VITE_GAOGE_SUPPORT_QR_URL: ${{ vars.VITE_GAOGE_SUPPORT_QR_URL }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4

@@ -16,7 +16,10 @@ use std::sync::{
 use std::time::{Duration, Instant};
 use tauri::State;
 
-const MANIFEST_URL: &str = "https://api.gaogeaii.com/mobile-components/stable.json";
+const MANIFEST_URL: &str = match option_env!("GAOGE_MOBILE_COMPONENT_MANIFEST_URL") {
+    Some(value) => value,
+    None => "",
+};
 const PUBLIC_KEY: &str = include_str!("../../resources/mobile-component-public-key.txt");
 const MAX_MANIFEST: u64 = 256 * 1024;
 const MAX_DOWNLOAD: u64 = 512 * 1024 * 1024;
@@ -114,30 +117,52 @@ fn plain_version(value: &str) -> Result<semver::Version, String> {
     Ok(parsed)
 }
 
-fn allowed_url(raw: &str) -> Result<url::Url, String> {
+fn safe_component_url(raw: &str) -> Result<url::Url, String> {
     let url = url::Url::parse(raw).map_err(|_| "组件下载地址不正确")?;
     let authority = raw
         .split_once("://")
         .map(|(_, rest)| rest.split('/').next().unwrap_or(""))
         .unwrap_or("");
-    if raw.chars().any(char::is_control)
+    if raw.trim() != raw
+        || raw.chars().any(char::is_control)
         || raw.contains('\\')
         || authority.contains('@')
         || url.scheme() != "https"
-        || url.host_str() != Some("api.gaogeaii.com")
+        || url.host_str().is_none()
+        || url.host_str().is_some_and(|host| host.ends_with('.'))
         || url.port_or_known_default() != Some(443)
         || !url.username().is_empty()
         || url.password().is_some()
         || url.query().is_some()
         || url.fragment().is_some()
-        || !url.path().starts_with("/mobile-components/")
         || url.path().contains('%')
-        || raw.contains("/../")
-        || raw.contains("/./")
+        || raw.split('/').any(|part| matches!(part, "." | ".."))
     {
-        return Err("组件下载地址不在官方组件目录内".into());
+        return Err("组件下载地址必须使用安全的 HTTPS 地址".into());
     }
     Ok(url)
+}
+
+fn allowed_url_with_manifest(raw: &str, configured_manifest: &str) -> Result<url::Url, String> {
+    if configured_manifest.trim().is_empty() {
+        return Err("未配置手机组件下载服务，请联系部署者配置组件清单地址".into());
+    }
+    let manifest = safe_component_url(configured_manifest)?;
+    let url = safe_component_url(raw)?;
+    let directory = manifest
+        .path()
+        .rsplit_once('/')
+        .map(|(parent, _)| format!("{parent}/"))
+        .filter(|parent| parent != "/")
+        .ok_or("组件清单必须位于专用组件目录内")?;
+    if url.origin() != manifest.origin() || !url.path().starts_with(&directory) {
+        return Err("组件下载地址不在配置的可信组件目录内".into());
+    }
+    Ok(url)
+}
+
+fn allowed_url(raw: &str) -> Result<url::Url, String> {
+    allowed_url_with_manifest(raw, MANIFEST_URL)
 }
 
 fn verified_manifest(envelope: &Envelope, public_key: &str) -> Result<Manifest, String> {
@@ -184,7 +209,9 @@ fn artifact_for_app<'a>(manifest: &'a Manifest, app_version: &str) -> Result<&'a
         .platforms
         .get(&platform_id())
         .ok_or("当前系统尚无可用的手机连接组件")?;
-    allowed_url(&artifact.url)?;
+    // Offline installed receipts are signed; network origin checks happen again before download.
+    // This preserves already-installed components when no download service is configured.
+    safe_component_url(&artifact.url)?;
     if artifact.executable != executable_name()
         || artifact.size == 0
         || artifact.size > MAX_DOWNLOAD
@@ -980,7 +1007,7 @@ mod tests {
             platforms: BTreeMap::from([(
                 platform_id(),
                 Artifact {
-                    url: "https://api.gaogeaii.com/mobile-components/1.0.0/test.tar.gz".into(),
+                    url: "https://api.example.invalid/mobile-components/1.0.0/test.tar.gz".into(),
                     sha256: format!("{:x}", Sha256::digest(b"ok")),
                     size: 2,
                     unpacked_size: 2,
@@ -1016,20 +1043,44 @@ mod tests {
     }
 
     #[test]
-    fn urls_cannot_redirect_authority_or_escape_official_directory() {
-        assert!(allowed_url(MANIFEST_URL).is_ok());
+    fn urls_require_explicit_config_and_cannot_escape_trusted_directory() {
+        let manifest_url = "https://api.example.invalid/mobile-components/stable.json";
+        assert!(allowed_url_with_manifest(manifest_url, manifest_url).is_ok());
+        assert!(allowed_url_with_manifest(manifest_url, "").is_err());
+        assert!(allowed_url_with_manifest(
+            "https://other.example.invalid/mobile-components/a",
+            manifest_url
+        )
+        .is_err());
+        assert!(
+            allowed_url_with_manifest("https://api.example.invalid/other/a", manifest_url).is_err()
+        );
+        assert!(
+            allowed_url_with_manifest(manifest_url, "https://api.example.invalid/stable.json")
+                .is_err()
+        );
+        assert!(allowed_url_with_manifest(
+            "https://api.example.invalid/mobile-components/releases/a.tar.gz",
+            manifest_url
+        )
+        .is_ok());
         for bad in [
-            "http://api.gaogeaii.com/mobile-components/stable.json",
-            "https://api.gaogeaii.com.evil.test/mobile-components/a",
-            "https://api.gaogeaii.com:8443/mobile-components/a",
-            "https://@api.gaogeaii.com/mobile-components/a",
-            "https://x:secret@api.gaogeaii.com/mobile-components/a",
-            "https://api.gaogeaii.com/mobile-components/../a",
-            "https://api.gaogeaii.com/mobile-components/%2e%2e/a",
-            "https://api.gaogeaii.com/mobile-components/a?url=evil",
-            "https://api.gaogeaii.com/mobile-components/a#x",
+            "http://api.example.invalid/mobile-components/stable.json",
+            "https://api.example.invalid.evil.test/mobile-components/a",
+            "https://api.example.invalid:8443/mobile-components/a",
+            "https://@api.example.invalid/mobile-components/a",
+            "https://x:secret@api.example.invalid/mobile-components/a",
+            "https://api.example.invalid/mobile-components/../a",
+            "https://api.example.invalid/mobile-components-sibling/a",
+            "https://api.example.invalid/mobile-components/.",
+            "https://api.example.invalid/mobile-components/%2e%2e/a",
+            "https://api.example.invalid/mobile-components/a?url=evil",
+            "https://api.example.invalid/mobile-components/a#x",
         ] {
-            assert!(allowed_url(bad).is_err(), "{bad}");
+            assert!(
+                allowed_url_with_manifest(bad, manifest_url).is_err(),
+                "{bad}"
+            );
         }
     }
 

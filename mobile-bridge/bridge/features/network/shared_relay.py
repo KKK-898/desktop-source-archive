@@ -12,6 +12,7 @@ from pathlib import Path
 from relay.protocol import MAX_BODY, MAX_FRAME, origin, validate, decode, content_type, download_headers
 from relay.stream import CHUNK, WINDOW, frame
 from bridge.features.auth.tls import client_context
+from bridge.features.network.deployment import account_relay_url
 
 
 def read_config(directory):
@@ -45,6 +46,7 @@ class Controller:
     def __init__(self, directory, test_http=False, config=None, save_hook=None):
         self.directory = Path(directory)
         self.test_http = test_http
+        self.account_relay = account_relay_url(test_http)
         self.memory_config = config
         self.save_hook = save_hook
 
@@ -89,8 +91,8 @@ class Controller:
                 secret = value.get('accountToken')
                 if not isinstance(secret, str) or not 16 <= len(secret) <= 8192:
                     raise ValueError('请先登录电脑软件。')
-                if not self.test_http and url != 'https://api.gaogeaii.com/mobile':
-                    raise ValueError('软件账号只能用于官方手机连接服务。')
+                if not self.test_http and (not self.account_relay or url != self.account_relay):
+                    raise ValueError('软件账号只能用于部署配置指定的受信任手机连接服务。')
                 result = self.request(url + '/relay/register-account', {'name': value.get('name')}, secret)
             else:
                 result = self.request(url + '/relay/register', {'invitation': value.get('invitation'), 'name': value.get('name')})

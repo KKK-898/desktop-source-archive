@@ -1,4 +1,10 @@
 interface ImportMetaEnv {
+  readonly VITE_GAOGE_SUPPORT_GROUP?: string
+  readonly VITE_GAOGE_SUPPORT_QR_URL?: string
+  readonly VITE_GAOGE_CODEX_RELAY_ORIGINS?: string
+  readonly VITE_GAOGE_MOBILE_RELAY_URL?: string
+  readonly VITE_GAOGE_CONTACT_ITEMS?: string
+  readonly VITE_GAOGE_DESKTOP_EMAIL_DOMAIN?: string
   readonly VITE_GAOGE_BOOTSTRAP_CONFIG_URLS?: string
   readonly VITE_GAOGE_CONFIG_DIRECTORY_URLS?: string
   readonly VITE_GAOGE_CONFIG_MAIN_URL?: string

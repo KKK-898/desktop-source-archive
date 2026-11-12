@@ -1,10 +1,12 @@
 {
   "schemaVersion": 1,
+  "publicationKind": "privacy-maintenance",
+  "sourceStatus": "Privacy maintenance of existing public source; not a new version, binary release, or corresponding-source replacement.",
   "version": "1.7.1",
-  "sourceCommit": "1891afd2af855f2bdbc537804afbd0b418e3472c",
-  "sourceTree": "3cc994f1f4b748cf74b244682464955c6f30d3a2",
+  "sourceCommit": "624f55325a0427fa37f2ba7afa90d17252bc9da1",
+  "sourceTree": "fb250642fe5005e8cdc9cd1693a861794d6cd6ae",
   "sourceMode": "git-ref",
-  "releaseReady": true,
+  "releaseReady": false,
   "exclusions": [
     {
       "path": ".vscode/extensions.json",
@@ -283,7 +285,7 @@
     {
       "path": "docs/cross-platform-release.md",
       "from": "scripts/public-source-docs/cross-platform-release.md",
-      "sha256": "40086a42e238b7432581f2e498b72092a9e7a33557406ee0760cdc1182e0ac29"
+      "sha256": "7928b9cb6c29bfbe4245d9120a4813c402c7d3ff2a3983635a052cb30b9d08ce"
     },
     {
       "path": "docs/release-1.7.1.md",
@@ -314,6 +316,11 @@
     },
     {
       "name": "sensitive_source_paths",
+      "ok": true,
+      "issues": []
+    },
+    {
+      "name": "operator_deployment_information",
       "ok": true,
       "issues": []
     },
@@ -373,9 +380,16 @@
       "issues": []
     },
     {
-      "name": "publication_mode",
+      "name": "privacy_maintenance_baseline",
       "ok": true,
       "issues": []
+    },
+    {
+      "name": "publication_mode",
+      "ok": false,
+      "issues": [
+        "Privacy maintenance is not a binary release or corresponding-source replacement"
+      ]
     }
   ],
   "rightsFindings": [],
@@ -1331,5 +1345,326 @@
       }
     }
   ],
-  "filesDigest": "820bde4eeb9f5f52637def3d6bee60312f3b3317460b93ec68679abc7255e5fd"
+  "filesDigest": "de67527850855e0286d24bc7b59dcb3cf8a4401ee1214a3362c30007213544ec",
+  "maintenanceBaseline": {
+    "repository": "KKK-898/desktop-source-archive",
+    "publicCommit": "51a064abd7337920435ee5939c00ba83a9277f06",
+    "publicTree": "c66afb8d71fc36372cd644d36fffb310b82f8de6",
+    "releaseVersion": "1.7.1",
+    "rightsDisclosureCount": 50,
+    "preservedFiles": [
+      {
+        "path": "LICENSE",
+        "sha256": "8486a10c4393cee1c25392769ddd3b2d6c242d6ec7928e1414efff7dfb2f07ef"
+      },
+      {
+        "path": "NOTICE.md",
+        "sha256": "c866303150bba2babacc29ebacb8a830749c6707114ab232361b328608ed8e3b"
+      },
+      {
+        "path": "THIRD_PARTY_NOTICES.md",
+        "sha256": "4b3e5f77655406ab71c79774a52c0ba6a303533aad378efcd2e583e385cdb9b6"
+      },
+      {
+        "path": "docs/login-company-logo-sources.md",
+        "sha256": "5773208ef874624d655b8f8fecd8b4c9113bafb46d4ae03a463bad0f0b49e987"
+      },
+      {
+        "path": "docs/login-university-logo-sources-extra.md",
+        "sha256": "4873bee8a899fb5ee03c256909591906a2d8bd7553793d96b79c44b6470abb45"
+      },
+      {
+        "path": "docs/login-university-logo-sources.md",
+        "sha256": "90e43485c033eb001fe676067200c258a71f49777c40a650ae46efe4c6d6f50d"
+      },
+      {
+        "path": "mobile-bridge/LICENSE",
+        "sha256": "c570fcd5f3e188c401eabd5c615e13a717048deb103a79fae32ea93635307067"
+      },
+      {
+        "path": "mobile-bridge/UPSTREAM.md",
+        "sha256": "c834c5dbd402c804e4d035d24a1591cad44bf91f3befa1df490162e1974ec7a3"
+      },
+      {
+        "path": "mobile-bridge/bridge/clients/LICENSE.coding-mobile",
+        "sha256": "be6b0be5ea6dd268401152c7fd02817487654150f47f58cc3c70c5ecc891f7b9"
+      },
+      {
+        "path": "mobile-bridge/web/vendor/katex/LICENSE",
+        "sha256": "766ccc1f306c885aa45542a9846bbd0a505b27a0374f146778171c2254ce18e3"
+      },
+      {
+        "path": "mobile-bridge/web/vendor/pdfjs/LICENSE",
+        "sha256": "0d542e0c8804e39aa7f37eb00da5a762149dc682d7829451287e11b938e94594"
+      },
+      {
+        "path": "mobile-bridge/web/vendor/pdfjs/cmaps/LICENSE",
+        "sha256": "abd69a0491a21582eabf70d5538f24027353c58eeaff574773147f4edf4c8ad2"
+      },
+      {
+        "path": "mobile-bridge/web/vendor/prism/LICENSE",
+        "sha256": "2b947f0901a7ffcf08a89957da9783c0e9c6e72cb6ce8e959f501ab5409e4d2b"
+      },
+      {
+        "path": "resources/codex-locales/zh-CN.pak",
+        "sha256": "2fcc82972ec5b9b3d1c7adbe7f5ccebbcec8f592383fd835c134a03e82bf8a24"
+      },
+      {
+        "path": "scripts/codex-plugin-patch.cjs",
+        "sha256": "a4b4bda741c18b825bd2dd9264f9ff60c96cc6b2eeaae7b49edc4a66901b0f16"
+      },
+      {
+        "path": "scripts/fixtures/codex-aggregate-selection-26.1103.js",
+        "sha256": "9480c8024d6d085ab5b8ddfad0dcfcb15d17bbb9799b506a6347ce64e2c207bd"
+      },
+      {
+        "path": "scripts/fixtures/codex-model-filter-26.1007.js",
+        "sha256": "ab7a77f5391828dc7b501aa6b6213fff91e5a6773ce6139521e2c48f473aa1f7"
+      },
+      {
+        "path": "scripts/fixtures/codex-model-filter-26.901.js",
+        "sha256": "a887e17facf6671dea23df0ae90f3e243f7d01ef9340149aa2ef0c98bd98eba7"
+      },
+      {
+        "path": "scripts/fixtures/codex-service-tier-gate-26.915.js",
+        "sha256": "c494c3fd30d9cc8dd8098e0b072791f4f437582cb92083b6797016d5a090695a"
+      },
+      {
+        "path": "scripts/fixtures/codex-ultra-query-26.1007.9446.js",
+        "sha256": "cb1c0ff2b44c446c681ceaf55342e3ec3102d75686707e671ace7af0562658f6"
+      },
+      {
+        "path": "scripts/fixtures/codex-ultra-query-26.1007.js",
+        "sha256": "73ee53ec97679a497f97ea2c182dc33d5940f68e8fe37aaf46665f893dec5a98"
+      },
+      {
+        "path": "scripts/fixtures/codex-ultra-query-26.1013.js",
+        "sha256": "161ec008e27f93526137d6fb9dc6256df71bf39737fb9ca825c9d9cedec1d213"
+      },
+      {
+        "path": "scripts/fixtures/codex-ultra-query-26.1016.js",
+        "sha256": "6af0be9ba3ccd52096f6854ad2a3dc4e5a56e377970a4c87b2581e64de28ea93"
+      },
+      {
+        "path": "scripts/fixtures/codex-ultra-query-26.1029.js",
+        "sha256": "2cfe05071d006d665d139450f4e3994ee12157f7db81284aadd382b9417888f5"
+      },
+      {
+        "path": "scripts/fixtures/codex-ultra-query-26.1103.js",
+        "sha256": "e0e306cbd1e676ebd6b6454b444d32216e06a08215081103e47b943f3f374846"
+      },
+      {
+        "path": "scripts/public-source-audit.json",
+        "sha256": "b93472273a8835b7cd0008d26855c7b701bf630625959437dcf56f3226f6d095"
+      },
+      {
+        "path": "scripts/public-source-docs/owner-release-decision-1.7.1.md",
+        "sha256": "a95d09b14f963a65fe2a07e6cd3929a85c83a10185fc7afda4538f2b94f05704"
+      },
+      {
+        "path": "src-tauri/src/third_party/codex-plus-plus/LICENSE",
+        "sha256": "8486a10c4393cee1c25392769ddd3b2d6c242d6ec7928e1414efff7dfb2f07ef"
+      },
+      {
+        "path": "src-tauri/src/third_party/codex-plus-plus/NOTICE.md",
+        "sha256": "ef0614195c0518e19eb5ffba835ce6608bb481e482bb6045648731229697e4fe"
+      },
+      {
+        "path": "src-tauri/src/third_party/codex-plus-plus/model-metadata/LICENSE",
+        "sha256": "8486a10c4393cee1c25392769ddd3b2d6c242d6ec7928e1414efff7dfb2f07ef"
+      },
+      {
+        "path": "src-tauri/src/third_party/codex-plus-plus/model-metadata/NOTICE.md",
+        "sha256": "5333075cfe3a060fbf7aa9af64d9dd166619eaf0a4e27a3c762bf2c346f25d81"
+      },
+      {
+        "path": "src/assets/customer-logos/beike.png",
+        "sha256": "0d20d014262c003c10a6fb91eb0fe3c38a649584743c2bc2e8c41f4589b26bb7"
+      },
+      {
+        "path": "src/assets/customer-logos/cau.png",
+        "sha256": "aacf769c2ef80a8b1eda410735c3cc68352bbe731a14944ce74b19fcf4bb3a31"
+      },
+      {
+        "path": "src/assets/customer-logos/csu.png",
+        "sha256": "4265b758833d6867cef987e00919c21531456aee2d610a2a8529a574439cf829"
+      },
+      {
+        "path": "src/assets/customer-logos/hust.png",
+        "sha256": "a815772c1b069aa7e920fbfdc12a094fe3415d48b5be48b7eff15591b6fd9a18"
+      },
+      {
+        "path": "src/assets/customer-logos/i-at.png",
+        "sha256": "033c1f4731f1bde1b57e4dbc3aa88f2267f5d2aebd61026986f74d0c77c52f52"
+      },
+      {
+        "path": "src/assets/customer-logos/jd-donghong.png",
+        "sha256": "33049c6e11eed96725ccdf9da61ccc4d6d69adfd4e86ac3ad5dc6b7117b4705c"
+      },
+      {
+        "path": "src/assets/customer-logos/kuaishou-dajia.png",
+        "sha256": "47f3cc372635e3f378c287dc8eebd2d1fa84ff12d475707b5078b6221cfe9412"
+      },
+      {
+        "path": "src/assets/customer-logos/lzu.png",
+        "sha256": "d5fba42abc96272b3b0328f202c1b5fff57e2b770f9fe9c8bc9571eff792d47f"
+      },
+      {
+        "path": "src/assets/customer-logos/mahua.png",
+        "sha256": "16e4f67a6163de598ff0beac6c13947ec275a96c6df31684e287043d369ffc51"
+      },
+      {
+        "path": "src/assets/customer-logos/miniworld.png",
+        "sha256": "b0ee6ce07dac2e73168bca4f492756f37425ca8f9e68a4c3671bf9c4be0c8ccc"
+      },
+      {
+        "path": "src/assets/customer-logos/modern-express.png",
+        "sha256": "11e2fe9eed784d7791d1993979b2a9dc700b72896430af62617f19c2b4f45ba0"
+      },
+      {
+        "path": "src/assets/customer-logos/nudt.png",
+        "sha256": "0aa6cad1237ebb64cf8dc10577e145cde765d96ef478ca08527a92f53b721659"
+      },
+      {
+        "path": "src/assets/customer-logos/supermap.png",
+        "sha256": "f936bd56b4b830eb100c6d567a6bd04414a73f06e12208950e38bc2fe14fd708"
+      },
+      {
+        "path": "src/assets/customer-logos/sysu.png",
+        "sha256": "f2d89651cff36b3f85a3be31fbba5f323af9cbc34226e50260d7c854d83eabf1"
+      },
+      {
+        "path": "src/assets/customer-logos/szu.png",
+        "sha256": "7ce8a0fa422d867c6307fa019d96c60231c9909b1928852e35953c1c21098f78"
+      },
+      {
+        "path": "src/assets/customer-logos/tongji.png",
+        "sha256": "9b1dc6ad970bca74e5e60c65896ab2a947db1902652205406180d00e706cc144"
+      },
+      {
+        "path": "src/assets/customer-logos/tsinghua.png",
+        "sha256": "22f8bae24a292359ad7b7bc0388cad32bfd85a96986c8261944d98ccdcd903c0"
+      },
+      {
+        "path": "src/assets/customer-logos/westlake.png",
+        "sha256": "075b4ec30bd6018af73742552945cfb7c8c513a68dfe5cf21f986d7cdf8bee96"
+      },
+      {
+        "path": "src/assets/customer-logos/zjnu.png",
+        "sha256": "ef6ce3cbdc4065fdebb813779e602aaa10254f484b858e2abdd9938b29500397"
+      },
+      {
+        "path": "src/assets/customer-logos/zuel.png",
+        "sha256": "f1485aab2b23a7b0a8181c1b2c46169bdbe284b934c840a896f73faf62b96ce9"
+      },
+      {
+        "path": "src/assets/provider-logos/claude.svg",
+        "sha256": "a67e829a1f62a1e1024fc75718aa49056f540c29e0a88a9949ccca8cd4745b16"
+      },
+      {
+        "path": "src/assets/provider-logos/deepseek.svg",
+        "sha256": "340240628ba95b147e252be0386fd801f8f3a35f14c411633767f4aa9c45c1d4"
+      },
+      {
+        "path": "src/assets/provider-logos/glm.svg",
+        "sha256": "b145d40f8373637ed4c32c425265b721a4b8b27067480a1596d60a09ea30302b"
+      },
+      {
+        "path": "src/assets/provider-logos/grok.svg",
+        "sha256": "fb9179372a0d7a2b03c2bd701343dcf6c82d90189f43accc5f8d69805e6f5993"
+      },
+      {
+        "path": "src/assets/provider-logos/kimi.svg",
+        "sha256": "89264832e891d42ed8aa05f8a8c60908af2f909e158105692aeb463ccbd65073"
+      },
+      {
+        "path": "src/assets/provider-logos/openai.svg",
+        "sha256": "54f14ccd805a266f6e97fa23361235b4e928043fd1c399060564027ab50ba132"
+      },
+      {
+        "path": "theme-resources/licenses/codex-qq-2007-ASSET-PROVENANCE.md",
+        "sha256": "bf357189b958eaa2b93b29bfbf8d54ad09d16484ca31d6490a36c8cf3bd22b92"
+      },
+      {
+        "path": "theme-resources/licenses/codex-qq-2007-LICENSE.txt",
+        "sha256": "98e55f8709cabb08a75b3930536706831812e6c747ff08b5d5ae16ceb95d8007"
+      },
+      {
+        "path": "theme-resources/licenses/codex-qq-2007-NOTICE.md",
+        "sha256": "bf30fa9f6d5072291ae07318ddd9f2453e7f97026451256e0d78b2f65a881a98"
+      },
+      {
+        "path": "theme-resources/licenses/heige-ASSET_PROVENANCE.md",
+        "sha256": "7752e457c99d9b93db60307efb2ff24892f9ef9ced05217c08b90f5e76168466"
+      },
+      {
+        "path": "theme-resources/licenses/heige-LICENSE.txt",
+        "sha256": "994a814b6e01a482e90658d96811c931a4b13e933967989b993130a20008033e"
+      },
+      {
+        "path": "theme-resources/licenses/heige-NOTICE.md",
+        "sha256": "dcf157672fa30a8b005edff764235110a7dc0f5a555852fe665f66ef6a9fc2ed"
+      },
+      {
+        "path": "theme-resources/licenses/qq-LICENSE.txt",
+        "sha256": "cd39b031b6dbb602f84687f78b1d1e2d681807a4a0e0437cba0d8edcc9e3f538"
+      },
+      {
+        "path": "theme-resources/licenses/qq-NOTICE.md",
+        "sha256": "ac35c2846a756cb3b09e4a3517cc603f7be531321a7ed5244ef52474079f9f9e"
+      },
+      {
+        "path": "theme-resources/sources/dalao-dianyan.webp",
+        "sha256": "489390d9ad49c303438187735e827620778b4e84cb036a8d884d1792ab3ec33e"
+      },
+      {
+        "path": "theme-resources/sources/deepspace-dawn.webp",
+        "sha256": "8d0b6d47bcbc6d39ecc91a897742b211fa58be8b0b9f8334c612dbeb8026089e"
+      },
+      {
+        "path": "theme-resources/sources/deepspace-star.webp",
+        "sha256": "f54f01c3190e0a40984de0d16913681870f2f457fd3f8a0a4c998a89a2928fc0"
+      },
+      {
+        "path": "theme-resources/sources/dragonball-super-saiyan.webp",
+        "sha256": "9b05d1b74abc7936ed2d4f5b80f1aa9f284dd0e5dd7817c2ce7d7a1e52ea473e"
+      },
+      {
+        "path": "theme-resources/sources/gaoge-preview-sheet.jpg",
+        "sha256": "2835bb2ccf5344c07b5088dae33eb7ca90a5392a53d51450c5a822826d94a3ae"
+      },
+      {
+        "path": "theme-resources/sources/genshin-dawn.webp",
+        "sha256": "75f0ceb98028492d88bdeca77da955a1b9d06d09b2dddb0cc3a5301c91621773"
+      },
+      {
+        "path": "theme-resources/sources/qq-2007-deep.svg",
+        "sha256": "08a94088f743c5567068af8d6419349e9e5200dc95769562d444e818e7bec9ab"
+      },
+      {
+        "path": "theme-resources/sources/qq-retro.png",
+        "sha256": "31bde93bb02d6723e0b6aa0ead675577604120acb0a6799163dd37f5cdd0a08e"
+      },
+      {
+        "path": "theme-resources/sources/wuthering-echo.webp",
+        "sha256": "d85fabf57ce3ceed3e3f8279898136469b65495c4379f9f471402d3c9541beed"
+      },
+      {
+        "path": "theme-resources/themes.json",
+        "sha256": "96d0000d56e1a00b85a280fb6e9583da6062cb0fe116b6c4331dc0856080fc1a"
+      },
+      {
+        "path": "theme-resources/vendor/codex-qq-2007-assets/assistant.png",
+        "sha256": "080718881233301fb93e3b52cbcda7a62ab21159beacd4ac46fc59a048443f13"
+      },
+      {
+        "path": "theme-resources/vendor/codex-qq-2007-assets/qq-show.png",
+        "sha256": "c6a7530cf8410c85c664ea94a7809a1bab885da47d74429afc70ece235da9681"
+      },
+      {
+        "path": "theme-resources/vendor/codex-qq-2007-assets/qq2007-icons.png",
+        "sha256": "1ec9533230a8ac61a2a4b0dd13d869b590a1c2b590e33bd3821f7daf21c9c19b"
+      }
+    ]
+  }
 }

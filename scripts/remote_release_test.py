@@ -26,7 +26,7 @@ class RemoteReleaseTests(unittest.TestCase):
                     }
                 },
             },
-            "https://api.gaogeaii.cc/gaogeaii/updates",
+            "https://updates.example.invalid/gaogeaii/updates",
             "1.4.2",
             "1.4.2",
         )
@@ -34,7 +34,7 @@ class RemoteReleaseTests(unittest.TestCase):
         self.assertEqual(entry["signature"], "signed")
         self.assertEqual(
             entry["url"],
-            "https://api.gaogeaii.cc/gaogeaii/updates/win/Gaoge%20Free_1.4.2_x64-setup.exe",
+            "https://updates.example.invalid/gaogeaii/updates/win/Gaoge%20Free_1.4.2_x64-setup.exe",
         )
 
     def test_safe_extract_rejects_path_traversal(self):

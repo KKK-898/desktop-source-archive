@@ -27,13 +27,13 @@ checks prevent filesystem alias overwrites before archive verification.
 
 ## Stable metadata
 
-`SOURCE_MANIFEST.json` has `schemaVersion: 1`, `version`, `sourceCommit`,
+`SOURCE_MANIFEST.json` has `schemaVersion: 1`, `publicationKind`, `version`, `sourceCommit`,
 `sourceTree`, and `files: [{path, sha256, size}]`. Paths use `/`, relative to the
 snapshot root, and are sorted. File hashes cover exact bytes. The manifest and
 `SOURCE_EXPORT_REPORT.json` are excluded from the file list to avoid recursion;
 both must additionally match byte-for-byte between the reviewed local snapshot,
 public source and actual private build input. The report carries the same source
-identity, `sourceMode`, `releaseReady`, `checks`, blocking `rightsFindings`,
+identity, `publicationKind`, `sourceStatus`, `sourceMode`, `releaseReady`, `checks`, blocking `rightsFindings`,
 visible unresolved `rightsDisclosures`, `exclusions`, `replacements` and `filesDigest`.
 
 `filesDigest` is SHA-256 of UTF-8 text formed by concatenating, in manifest order,
@@ -46,9 +46,53 @@ statement. It may coexist with explicit owner-directed unresolved disclosures
 under the narrowly bound 1.7.1 decision described below. The exporter does not
 claim that scanning proves legal clearance or exhaustive secret absence.
 
+## Non-release snapshot modes
+
+`releaseReady: false` has three distinct meanings; read `publicationKind`:
+
+| Kind | Purpose and limits |
+| --- | --- |
+| `review-only` | Local inspection only, possibly with content findings; not publishable. |
+| `development-snapshot` | An immutable, unreleased development snapshot. All content/privacy/completeness checks must pass, and unresolved items cannot borrow the historical 1.7.1 release direction. Not corresponding source for an existing binary. |
+| `privacy-maintenance` | A narrow privacy cleanup against the independently pinned already-public 1.7.1 snapshot. It preserves historical rights/attribution bytes and disclosures, not a new release or rights authorization. |
+
+Normal release exports use `publicationKind: "release-source"`. Older existing
+release metadata may omit that field. Development and maintenance deliberately
+record a failed `publication_mode` check and `releaseReady: false`, even when their
+content checks succeed. Do not change the flag, drop a check, reuse old metadata,
+or pass these artifacts to release verification to approve installer publication.
+A retained `version: "1.7.1"` is not evidence that a changed tree corresponds to
+an existing 1.7.1 installer.
+
+Both non-review modes require a full immutable `--ref` commit and reject
+`--working-tree` / `--review-only`. They cannot be combined with each other.
+Examples, with a new output directory and placeholder paths:
+
+```powershell
+$commit = (git rev-parse HEAD).Trim()
+python scripts/export_public_source.py --ref $commit --development-snapshot --output-directory release/development-source
+# Alternative maintenance flow, not a second step:
+python scripts/export_public_source.py --ref $commit --privacy-maintenance-baseline release/verified-public-1.7.1-baseline --output-directory release/privacy-maintenance-source
+```
+
+The maintenance baseline argument is a **local complete snapshot directory**,
+not a Git checkout or just a manifest. The exporter does no network fetching. It
+requires the exact independently pinned public commit/tree represented by the
+existing 1.7.1 build.2 source; recomputes the Git tree; validates all file hashes,
+metadata and disclosures; and requires the 50 scoped historical files, audit,
+original decision, licenses, third-party notices and provenance to remain byte
+identical. An arbitrary self-authored baseline cannot grant an exception.
+
+Maintenance adds `PRIVACY_MAINTENANCE.md` and a `maintenanceBaseline` record to
+both JSON metadata files. Development adds `DEVELOPMENT_SNAPSHOT.md`. The privacy
+maintenance direction does **not** amend the historical owner decision, clear
+unverified rights, or authorize a later version. Future releases must satisfy
+fresh release rights/completeness gates and publish their own exact corresponding
+source. No existing tag, source ZIP, binary or checksum is replaced by either mode.
+
 ## Publication without changing the build source
 
-Create the public snapshot repository and the private build snapshot from this
+For a formal binary release, create the public snapshot repository and the private build snapshot from this
 **same directory**, not from a fresh full archive of the private development repo.
 Before adding files, run `git init` followed immediately by
 `git config core.autocrlf false` (or configure it globally before `git init`).
@@ -57,7 +101,10 @@ Commit all snapshot source and both metadata JSONs, then use the matching releas
 tag. This preserves the same Git tree in the public and private build snapshots.
 The public tag must resolve and its anonymous archive must match every manifest
 entry before signing or update promotion. Never make the original development
-repository public as a shortcut.
+repository public as a shortcut. The public repository is now named
+`desktop-source-archive`; use its current direct URL for strict verification.
+Updating its branch with a non-release maintenance snapshot never changes the
+meaning or contents of the existing `v1.7.1-build.2` release tag.
 
 ## Rights audit and explicit publication direction
 

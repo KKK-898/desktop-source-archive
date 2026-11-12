@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import * as QRCode from 'qrcode'
+import { isConfiguredAccountRelay, readFrontendDeploymentValue } from '../frontend-deployment'
 import {
   ArrowUpRight, Check, ChevronDown, Copy, Download, Eye, EyeOff, Globe2, KeyRound,
   Laptop, LoaderCircle, LockKeyhole, MessageSquareText, Power, QrCode,
@@ -69,9 +70,7 @@ const relayChanged = computed(() => relayUrl.value.trim().replace(/\/$/, '') !==
 const automaticEnrollment = computed(() => {
   if (!props.accountToken) return false
   try {
-    const url = new URL(relayUrl.value.trim())
-    return url.origin === 'https://api.gaogeaii.com' && url.pathname.replace(/\/+$/, '') === '/mobile'
-      && !url.username && !url.password && !url.search && !url.hash
+    return isConfiguredAccountRelay(relayUrl.value, readFrontendDeploymentValue('VITE_GAOGE_MOBILE_RELAY_URL'))
   } catch {
     return false
   }

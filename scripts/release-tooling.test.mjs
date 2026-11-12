@@ -80,12 +80,12 @@ test('builds same-host mirror manifests without changing signatures', () => {
         url: 'https://old.example/win/Gaoge-Free-latest-windows-x64-setup.exe',
       },
     },
-  }, 'https://api.gaogeaii.cc/gaogeaii/updates', '1.4.2')
+  }, 'https://updates.example.invalid/gaogeaii/updates', '1.4.2')
   assert.equal(result.minimumVersion, '1.4.2')
   assert.equal(result.platforms['windows-x86_64'].signature, 'signed')
   assert.equal(
     result.platforms['windows-x86_64'].url,
-    'https://api.gaogeaii.cc/gaogeaii/updates/win/Gaoge-Free-latest-windows-x64-setup.exe',
+    'https://updates.example.invalid/gaogeaii/updates/win/Gaoge-Free-latest-windows-x64-setup.exe',
   )
 })
 

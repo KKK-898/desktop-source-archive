@@ -25,13 +25,17 @@ DESKTOP_WRITE = {'send', 'stop', 'settings', 'respond', 'create', 'access', 'upl
 def origin(value, test_http=False):
     if not isinstance(value, str):
         raise ValueError('Relay URL required')
+    if any(c.isspace() or ord(c) < 32 or ord(c) == 127 for c in value) or any(c in value for c in ('\\', '@', '?', '#', '%')):
+        raise ValueError('Relay URL requires a clean HTTPS origin and optional path prefix')
     p = urlsplit(value)
     if (not p.hostname or p.username or p.password or p.query or p.fragment
             or not re.fullmatch(r'(?:/[A-Za-z0-9_-]+)*/?', p.path) or p.port == 0):
         raise ValueError('Relay URL requires a clean HTTPS origin and optional path prefix')
     if p.scheme != 'https' and not (test_http and p.scheme == 'http' and p.hostname in ('127.0.0.1', 'localhost', '::1')):
         raise ValueError('Relay requires HTTPS')
-    return value.rstrip('/')
+    host = '[' + p.hostname + ']' if ':' in p.hostname else p.hostname
+    port = '' if p.port in (None, 443 if p.scheme == 'https' else 80) else ':' + str(p.port)
+    return p.scheme + '://' + host + port + p.path.rstrip('/')
 
 
 def validate(method, path, size=0):

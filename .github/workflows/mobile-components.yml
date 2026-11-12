@@ -32,6 +32,7 @@ jobs:
     timeout-minutes: 40
     env:
       MOBILE_RUNTIME: ${{ matrix.runtime }}
+      GAOGE_MOBILE_COMPONENT_MANIFEST_URL: ${{ vars.GAOGE_MOBILE_COMPONENT_MANIFEST_URL }}
       MACOSX_DEPLOYMENT_TARGET: '11.0'
     steps:
       - uses: actions/checkout@v4

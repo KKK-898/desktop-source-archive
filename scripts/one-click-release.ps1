@@ -9,7 +9,7 @@ param(
   [switch] $KeepBuildPrivate = $true,
 
   [ValidatePattern('^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$')]
-  [string] $PublicSourceRepository = "KKK-898/Gaoge-Free-Desktop",
+  [string] $PublicSourceRepository = "KKK-898/desktop-source-archive",
 
   [ValidateNotNullOrEmpty()]
   [string] $ReleaseTag = "v$Version"
@@ -137,6 +137,7 @@ function Read-ReleaseConfig {
     $remoteRoot = [string](Get-Property $mirror "remoteRoot" "")
     if (-not $remoteRoot.StartsWith('/')) { throw "Mirror $id remoteRoot must be an absolute Linux path." }
   }
+  Invoke-Checked node (Join-Path $script:Root "scripts/deployment-config.mjs") validate $script:ConfigPath
   return $config
 }
 
@@ -360,7 +361,7 @@ function Export-BuildSnapshot([string] $TagName, [string] $BuildBranch) {
     Invoke-Checked git init
     Invoke-Checked git config core.autocrlf false
     Invoke-Checked git config user.name "Gaoge Release Bot"
-    Invoke-Checked git config user.email "release-bot@gaogeai.cloud"
+    Invoke-Checked git config user.email "release-bot@example.invalid"
     Invoke-Checked git checkout -b $BuildBranch
     Invoke-Checked git add .
     Invoke-Checked git commit -m "release: build snapshot $TagName"
@@ -676,6 +677,8 @@ if ([string]::IsNullOrWhiteSpace($remoteSourceTag)) {
   }
 }
 Write-Info "release commit: $releaseSha"
+
+Invoke-Checked node (Join-Path $script:Root "scripts/deployment-config.mjs") sync $script:ConfigPath $script:BuildRepo
 
 $bootstrapValue = (@(Get-Property $config "bootstrapConfigUrls" @()) -join ',')
 $primaryUpdateBase = ([string](@(Get-Property $config "updateMirrors" @())[0].publicBaseUrl)).TrimEnd('/')

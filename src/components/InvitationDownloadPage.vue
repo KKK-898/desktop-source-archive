@@ -46,9 +46,7 @@ interface RegistrationMarker {
   createdAt?: number
 }
 
-const DEFAULT_DOWNLOAD_BASE_URL = typeof window === 'undefined'
-  ? 'https://ruanjian.gaogeaii.com/gaogeaii/updates'
-  : `${window.location.origin}/gaogeaii/updates`
+const DEFAULT_DOWNLOAD_BASE_URL = ''
 const SUCCESS_MARKER_TTL = 30 * 24 * 60 * 60 * 1000
 
 const previewParams = typeof window === 'undefined' ? null : new URLSearchParams(window.location.search)
@@ -96,7 +94,7 @@ const downloadPackages = computed<DownloadPackage[]>(() => [
     eyebrow: 'Windows 10 / 11',
     title: 'Windows 安装包',
     detail: '适合大多数电脑，下载后按提示完成安装。',
-    url: `${downloadBaseUrl.value}/win/Gaoge-Free-latest-windows-x64-setup.exe`,
+    url: downloadBaseUrl.value ? `${downloadBaseUrl.value}/win/Gaoge-Free-latest-windows-x64-setup.exe` : '',
     icon: Monitor,
   },
   {
@@ -104,7 +102,7 @@ const downloadPackages = computed<DownloadPackage[]>(() => [
     eyebrow: 'Apple 芯片与 Intel',
     title: 'macOS 安装包',
     detail: '通用 DMG 安装包，下载后拖入“应用程序”。',
-    url: `${downloadBaseUrl.value}/mac/Gaoge-Free-latest-macos-universal.dmg`,
+    url: downloadBaseUrl.value ? `${downloadBaseUrl.value}/mac/Gaoge-Free-latest-macos-universal.dmg` : '',
     icon: Laptop,
   },
   {
@@ -112,7 +110,7 @@ const downloadPackages = computed<DownloadPackage[]>(() => [
     eyebrow: 'Linux 桌面系统',
     title: 'Linux 安装包',
     detail: 'AppImage 版本，赋予执行权限后即可运行。',
-    url: `${downloadBaseUrl.value}/linux/Gaoge-Free-latest-linux-x86_64.AppImage`,
+    url: downloadBaseUrl.value ? `${downloadBaseUrl.value}/linux/Gaoge-Free-latest-linux-x86_64.AppImage` : '',
     icon: Terminal,
   },
 ])
@@ -546,10 +544,11 @@ onUnmounted(() => {
             <small>{{ item.eyebrow }}</small>
             <h2>{{ item.title }}</h2>
             <p>{{ item.detail }}</p>
-            <a :href="item.url">
+            <a v-if="item.url" :href="item.url">
               <Download :size="18" />
               下载最新版
             </a>
+            <span v-else>暂未配置下载地址</span>
           </article>
         </div>
 

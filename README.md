@@ -1,4 +1,4 @@
-# Gaoge Free Desktop
+# Desktop Source Archive
 
 Gaoge Free is an independent Vue 3 / TypeScript / Rust / Tauri 2 desktop client.
 The covered project software is licensed **AGPL-3.0-only**. Read `LICENSE`,
@@ -8,14 +8,39 @@ are included, and this project is not endorsed by the products it interoperates 
 
 ## Release source
 
-Public source: https://github.com/KKK-898/Gaoge-Free-Desktop
+Public source: https://github.com/KKK-898/desktop-source-archive
 
-Use the `v<version>` tag matching the installed application, not an unrelated
-branch tip. Exported releases contain `SOURCE_MANIFEST.json` with source revision,
-file sizes and SHA-256 hashes, plus `SOURCE_EXPORT_REPORT.json`. A report with
-`releaseReady: false` is a **local review snapshot, not an approved release**.
-The original development repository remains private; the public repository
-contains reviewed release snapshots without its private history.
+Use the exact `v<version>` or `v<version>-build.N` tag matching the installed
+application, not the current branch tip. Exported source contains
+`SOURCE_MANIFEST.json` and `SOURCE_EXPORT_REPORT.json` with source identity and
+file hashes. Check `publicationKind` and the report's `releaseReady` field, not
+just the retained package version (`releaseReady` is not a manifest field):
+
+- `release-source`: an eligible release candidate only when `releaseReady: true`;
+  anonymous verification and matching build input are still required.
+- `review-only`: local review only; never authorized for public upload.
+- `development-snapshot`: unreleased source with independent rights checks; not
+  corresponding source for an existing installer or update.
+- `privacy-maintenance`: a constrained cleanup of the fixed already-public 1.7.1
+  baseline, preserving its 50 exact historical rights disclosures and notices;
+  not a new version, binary release or corresponding-source replacement.
+
+The last three kinds intentionally have `releaseReady: false`; that flag alone
+no longer means that every artifact is a local review. Development/maintenance
+content must pass its own gates and must never authorize installer publication.
+The original development repository stays private. Existing `v1.7.1-build.2`,
+its source ZIP and binaries remain unchanged. Each later covered binary release
+requires its own complete corresponding source, not a one-time reduced edition.
+
+## Release workflow
+
+See [the private-build / corresponding-source workflow](docs/public-release-workflow.md).
+Public source defaults contain no operator endpoints or contact QR assets.
+Complete feature implementations, required build inputs and license notices remain;
+remote-service features require the builder's own configuration, not hidden code.
+The workflow documents all nine allowlisted deployment fields, private
+`.release.local.json` / ignored `.env.local`, CI variables, and exact validation,
+synchronization and release commands. Never put credentials in `VITE_*` values.
 
 ## Requirements
 
@@ -85,6 +110,12 @@ build inputs, submodules and symlinks. `--working-tree --review-only` is for loc
 inspection only and cannot produce `releaseReady: true`. The separate 1.7.1
 owner-directed decision retains 50 unresolved items as visible `rightsDisclosures`,
 not legal clearance; see `scripts/public-source-docs/owner-release-decision-1.7.1.md`.
+`--development-snapshot` requires a full immutable commit and does not inherit
+that historical release decision. The separately constrained
+`--privacy-maintenance-baseline <verified-baseline-directory>` mode checks the
+fixed already-public 1.7.1 tree and preserves all 50 original disclosures without
+extending them to future versions; it is not a rights-gate bypass. Both modes
+produce non-release metadata and are rejected by the binary release verifier.
 The output directory
 must not exist. See `scripts/public-source-docs/source-delivery.md` for the
 manifest format and publisher verification. Before staging a snapshot, set

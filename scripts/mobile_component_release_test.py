@@ -7,14 +7,18 @@ import tarfile
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 SCRIPTS = Path(__file__).resolve().parent
 sys.path.insert(0, str(SCRIPTS))
-from mobile_component_release import archive_details, platform_metadata, release_config, validate_archive_links
+from mobile_component_release import archive_details, component_base_url, platform_metadata, release_config, validate_archive_links
 
 
 class ComponentArchiveTests(unittest.TestCase):
     def setUp(self):
+        deployment = patch.dict(os.environ, {'GAOGE_MOBILE_COMPONENT_MANIFEST_URL': 'https://components.example.invalid/mobile-components/stable.json'})
+        deployment.start()
+        self.addCleanup(deployment.stop)
         self.directory = tempfile.TemporaryDirectory(prefix='gaoge-component-fixture-')
         self.addCleanup(self.directory.cleanup)
         self.filename = Path(self.directory.name) / 'runtime.tar.gz'
@@ -167,6 +171,35 @@ class MainBundleTests(unittest.TestCase):
             leaked.mkdir(parents=True)
             with self.assertRaisesRegex(ValueError, 'leaked'):
                 module.verify_bundle('mac', bundle)
+
+
+class ComponentDeploymentTests(unittest.TestCase):
+    def test_release_requires_explicit_trusted_manifest(self):
+        with patch.dict(os.environ, {'GAOGE_MOBILE_COMPONENT_MANIFEST_URL': ''}):
+            with self.assertRaisesRegex(ValueError, 'explicitly configured'):
+                component_base_url()
+
+    def test_trusted_directory_is_canonical_and_retains_path_case(self):
+        with patch.dict(os.environ, {'GAOGE_MOBILE_COMPONENT_MANIFEST_URL': 'HTTPS://COMPONENTS.EXAMPLE.INVALID:443/Mobile/stable.json'}):
+            self.assertEqual('https://components.example.invalid/Mobile', component_base_url())
+
+    def test_unsafe_manifest_cannot_define_component_trust(self):
+        for value in ('http://components.example.invalid/mobile/stable.json',
+                      'https://components.example.invalid:444/mobile/stable.json',
+                      'https://user@components.example.invalid/mobile/stable.json',
+                      'https://components.example.invalid/mobile/stable.json?query=1',
+                      'https://components.example.invalid/mobile/stable.json#fragment',
+                      'https://components.example.invalid/mobile/stable.json?',
+                      'https://components.example.invalid/stable.json',
+                      'https://components.example.invalid/mobile/',
+                      'https://components.example.invalid/mobile/../stable.json',
+                      'https://components.example.invalid/mobile/%2e%2e/stable.json',
+                      'https://components.example.invalid./mobile/stable.json',
+                      ' https://components.example.invalid/mobile/stable.json',
+                      'https://components.example.invalid/mobile/stable.json\n'):
+            with self.subTest(value=value), patch.dict(os.environ, {'GAOGE_MOBILE_COMPONENT_MANIFEST_URL': value}):
+                with self.assertRaises(ValueError):
+                    component_base_url()
 
 
 if __name__ == '__main__':
