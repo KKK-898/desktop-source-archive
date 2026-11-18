@@ -1,11 +1,10 @@
-var CODEX_API_MODE_RUNTIME_VERSION = 8;
+var CODEX_API_MODE_RUNTIME_VERSION = 9;
 
-// A native API window loses its account-scoped desktop catalog at startup.
-// Restore the verified local snapshot once, then persist native edits using CAS.
-// Native account switching closes this window's RPC port before changing owner.
+// Legacy renderer-owner hosts require verified snapshot restore/CAS. Reviewed
+// content-owner hosts retain same-home local projects natively; never replay a
+// legacy cache over their current shared catalog, edits or explicit removals.
 function createCodexApiLocalProjectsGuard(bindings, { getState, bridge }) {
   const keys = ['electron-saved-workspace-roots', 'electron-workspace-root-labels', 'local-projects'];
-  const ownerKey = 'electron-account-renderer-state-v1';
   const atomsKey = 'electron-persisted-atom-state';
   const checkpointKey = 'gaoge:api-local-projects-hydrated-v1';
   let disposed = false, scope = null, revision = null, hydrated = false;
@@ -78,17 +77,36 @@ function createCodexApiLocalProjectsGuard(bindings, { getState, bridge }) {
     async synchronize(snapshot, isCurrent) {
       error = '';
       if (!snapshot) { retire('awaiting-local-project-snapshot'); return; }
-      if (!validate(snapshot)) throw new Error('Invalid API local project snapshot');
-      if (!bindings.localOnboarding?.hostReady?.()) { retire('awaiting-host-hydration'); return; }
+      if (disposed || getState()?.apiCodingModeEnabled !== true || !isCurrent()) { retire('local-project-identity-changed'); return; }
+      if (snapshot?.unavailable === true) {
+        retire(snapshot.reason === 'unverified-native-project-scope' ? snapshot.reason : 'awaiting-local-project-snapshot');
+        return;
+      }
+      const nativeShared = snapshot?.storage === 'native-shared';
+      if (nativeShared ? snapshot.version !== 1 || typeof snapshot.scope !== 'string' || !snapshot.scope.length
+          || snapshot.scope.length > 256 || !Number.isSafeInteger(snapshot.runtimeRevision) || snapshot.runtimeRevision < 0
+        : !validate(snapshot)) throw new Error('Invalid API local project snapshot');
+      const onboarding = bindings.localOnboarding;
+      if (!onboarding?.hostReady?.()) { retire('awaiting-host-hydration'); return; }
+      const contract = onboarding.projectOwnerContract?.();
+      if (contract !== 'renderer-owner' && contract !== 'content-owner') { retire('unknown-native-project-owner'); return; }
+      const ownerKey = contract === 'content-owner' ? 'electron-renderer-content-owner' : 'electron-account-renderer-state-v1';
       const identity = snapshotKey(snapshot);
       if (scope !== null && scope !== snapshot.scope) { retire('local-project-scope-changed'); return; }
       const services = bindings.appServices, appState = services?.applicationState;
-      const current = () => !disposed && isCurrent() && snapshotKey(getState()?.apiLocalProjects) === identity
-        && bindings.appServices === services;
+      const current = () => {
+        const state = getState();
+        return !disposed && state?.apiCodingModeEnabled === true && isCurrent() && snapshotKey(state.apiLocalProjects) === identity
+          && (state.apiLocalProjects?.storage === 'native-shared') === nativeShared
+          && bindings.appServices === services && bindings.localOnboarding === onboarding && onboarding.hostReady();
+      };
       const check = async () => {
         if (!current()) throw new Error('API local project identity changed');
         const marker = await invoke(appState, 'read', [ownerKey]);
-        if (!current() || marker?.value?.owner != null) throw new Error('API local project owner changed');
+        const value = marker?.value;
+        const apiOwner = contract === 'content-owner' ? value === 'signed-out' : value !== null && typeof value === 'object'
+          && !Array.isArray(value) && Object.hasOwn(value, 'owner') && value.owner === null;
+        if (!current() || !apiOwner) throw new Error('API local project owner changed or is unavailable');
       };
       const readCheckpoint = async () => {
         await check();
@@ -128,6 +146,29 @@ function createCodexApiLocalProjectsGuard(bindings, { getState, bridge }) {
       };
       try {
         await check();
+        if (contract === 'content-owner') {
+          if (!nativeShared) { retire('awaiting-native-shared-project-grant'); return; }
+          // Native storage is authoritative for shared same-home projects. Read
+          // through native services only: no cache import, state write or CAS.
+          const catalog = await invoke(services.projectCatalog, 'readLocalProjects');
+          await check();
+          const memberships = await invoke(services.threadProjectAssignments, 'readMemberships');
+          await check();
+          const object = value => value !== null && typeof value === 'object' && !Array.isArray(value);
+          if (!object(catalog) || !object(memberships) || !object(memberships.assignments)
+              || !Array.isArray(memberships.projectlessThreadIds)
+              || !memberships.projectlessThreadIds.every(id => typeof id === 'string')) {
+            throw new Error('Native shared local project readback is malformed');
+          }
+          scope = snapshot.scope;
+          hydrated = true;
+          revision = null;
+          ready = true;
+          verifiedAt = Date.now();
+          reason = 'native-shared-local-projects-verified';
+          return;
+        }
+        if (nativeShared) { retire('native-project-contract-changed'); return; }
         // A settings refresh renews the grant for the same home. Keep the
         // once-only hydration and CAS state; an in-flight call still checks
         // its captured runtimeRevision at every asynchronous boundary.

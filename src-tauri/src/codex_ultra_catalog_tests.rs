@@ -2,7 +2,9 @@
 fn codex_ultra_catalog_keeps_native_delegation_and_upgrades_known_fallbacks() {
     for model in [
         "gpt-5.6-sol", "gpt-5.6-terra", "gpt-6-astra", "gpt-6-sol",
-        "gpt-6.1-sol", "gpt-6-astra-2026-09-01", "gaoge/openai/full/gpt-6.1-sol",
+        "gpt-6.1-sol", "gpt-6.2-astra", "gpt-6.2-sol",
+        "gpt-6-astra-2026-09-01", "gaoge/openai/full/gpt-6.1-sol",
+        "gpt-6.2-astra-2026-11-18", "gaoge/openai/full/gpt-6.2-sol",
     ] {
         let fallback = codex_native_responses_model_entry(model, 0);
         assert_eq!(fallback["multi_agent_version"], "v2", "{model}");

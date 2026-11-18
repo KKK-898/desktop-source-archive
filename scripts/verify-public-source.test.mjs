@@ -401,20 +401,33 @@ function rebuildSnapshotMetadata(files) {
 // actual artwork, logos, locale pack, or native excerpts. Asset hash metadata stubs
 // exercise validateSnapshot after the hashing stage; archive/local hashing is
 // independently covered by the synthetic end-to-end tests above.
-function ownerPublicationSnapshot() {
-  assert.equal(hash(evidenceBytes), OWNER_EVIDENCE_SHA256)
+const CURRENT_OWNER_EVIDENCE = 'scripts/public-source-docs/owner-release-decision-1.7.2.md'
+const CURRENT_OWNER_EVIDENCE_SHA256 = '2f306647796e027dc745d8fbbf1f1ebeea11085a4b4259ec90f40b78b089ed25'
+const currentEvidenceBytes = await readFile(new URL('./public-source-docs/owner-release-decision-1.7.2.md', import.meta.url))
+const currentEvidenceScope = JSON.parse([...currentEvidenceBytes.toString('utf8').matchAll(/```json\s*\r?\n([\s\S]*?)\r?\n```/gu)][0][1])
+
+function ownerPublicationSnapshot(version = '1.7.1') {
+  const current = version === '1.7.2'
+  const record = current
+    ? { version, decisionId: 'gaoge-1.7.2-2026-11-18', evidencePath: CURRENT_OWNER_EVIDENCE, hash: CURRENT_OWNER_EVIDENCE_SHA256,
+        bytes: currentEvidenceBytes, scope: currentEvidenceScope, disclosureField: 'retainsUnverifiedDisclosures' }
+    : { version, decisionId: 'gaoge-1.7.1-2026-11-12', evidencePath: OWNER_EVIDENCE, hash: OWNER_EVIDENCE_SHA256,
+        bytes: evidenceBytes, scope: evidenceScope, disclosureField: 'acknowledgesUnverifiedRights' }
+  assert.equal(hash(record.bytes), record.hash)
   const files = new Map([...snapshot()].map(([name, bytes]) => [name, sourceItem(bytes)]))
-  const decisions = evidenceScope.items.map((item) => ({
-    type: 'owner-directed-publication', decisionId: 'gaoge-1.7.1-2026-11-12', version: '1.7.1', sha256: item.sha256,
-    evidence: [{ path: OWNER_EVIDENCE, sha256: OWNER_EVIDENCE_SHA256 }], acknowledgesUnverifiedRights: true,
+  editSnapshotJson(files, MANIFEST, manifest => { manifest.version = version })
+  editSnapshotJson(files, REPORT, report => { report.version = version })
+  const decisions = record.scope.items.map((item) => ({
+    type: 'owner-directed-publication', decisionId: record.decisionId, version, sha256: item.sha256,
+    evidence: [{ path: record.evidencePath, sha256: record.hash }], [record.disclosureField]: true,
   }))
-  const audit = { schemaVersion: 1, items: evidenceScope.items.map((item, index) => ({ ...structuredClone(item), releaseDecision: structuredClone(decisions[index]) })) }
-  const disclosures = evidenceScope.items.map((item, index) => ({ path: item.path, status: item.status, reason: item.reason, sha256: item.sha256, releaseDecision: structuredClone(decisions[index]) }))
-  for (const item of evidenceScope.items) files.set(item.path, { size: 1, sha256: item.sha256 })
-  for (const item of evidenceScope.items) {
+  const audit = { schemaVersion: 1, items: record.scope.items.map((item, index) => ({ ...structuredClone(item), releaseDecision: structuredClone(decisions[index]) })) }
+  const disclosures = record.scope.items.map((item, index) => ({ path: item.path, status: item.status, reason: item.reason, sha256: item.sha256, releaseDecision: structuredClone(decisions[index]) }))
+  for (const item of record.scope.items) files.set(item.path, { size: 1, sha256: item.sha256 })
+  for (const item of record.scope.items) {
     for (const name of item.evidence) if (!files.has(name)) files.set(name, sourceItem(Buffer.from('Synthetic presence-only provenance evidence fixture.\n')))
   }
-  files.set(OWNER_EVIDENCE, sourceItem(evidenceBytes))
+  files.set(record.evidencePath, sourceItem(record.bytes))
   files.set(RIGHTS_AUDIT, sourceItem(json(audit)))
   editSnapshotJson(files, REPORT, (report) => { report.rightsDisclosures = disclosures })
   rebuildSnapshotMetadata(files)
@@ -439,6 +452,56 @@ test('retains all 50 exact unverified disclosures under the version-bound owner 
   assert.deepEqual(result.report.rightsDisclosures.map(({ path, sha256, status, reason }) => ({ path, sha256, status, reason })),
     evidenceScope.items.map(({ path, sha256, status, reason }) => ({ path, sha256, status, reason })))
   assert.equal(result.report.rightsDisclosures.some((item) => ['cleared', 'verified', 'replaced-original'].includes(item.status)), false)
+})
+
+test('1.7.2 direction retains the same 50 unresolved findings without inventing owner acknowledgement', () => {
+  assert.deepEqual(currentEvidenceScope.items, evidenceScope.items)
+  const files = ownerPublicationSnapshot('1.7.2')
+  const result = validateSnapshot(files, new Set(), '1.7.2')
+  assert.equal(result.report.rightsDisclosures.length, 50)
+  for (const item of result.report.rightsDisclosures) {
+    assert.equal(item.releaseDecision.retainsUnverifiedDisclosures, true)
+    assert.equal(Object.hasOwn(item.releaseDecision, 'acknowledgesUnverifiedRights'), false)
+    assert.equal(['cleared', 'verified', 'replaced-original'].includes(item.status), false)
+  }
+})
+
+const currentOwnerMutationCases = [
+  ['missing current evidence', files => files.delete(CURRENT_OWNER_EVIDENCE)],
+  ['changed current evidence', files => files.set(CURRENT_OWNER_EVIDENCE, sourceItem(Buffer.concat([currentEvidenceBytes, Buffer.from('changed')])))],
+  ['changed asset', files => { files.get(currentEvidenceScope.items[0].path).sha256 = '0'.repeat(64) }],
+  ['missing asset', files => files.delete(currentEvidenceScope.items[0].path)],
+  ['changed original reason', files => editOriginalBoth(files, 'reason', 'invented permission')],
+  ['fake cleared status', files => editOriginalBoth(files, 'status', 'cleared')],
+  ['missing disclosure', files => editSnapshotJson(files, REPORT, report => report.rightsDisclosures.pop())],
+  ['missing preservation flag', files => editDecisionBoth(files, decision => { delete decision.retainsUnverifiedDisclosures })],
+  ['false preservation flag', files => editDecisionBoth(files, decision => { decision.retainsUnverifiedDisclosures = false })],
+  ['invented acknowledgement', files => editDecisionBoth(files, decision => { decision.acknowledgesUnverifiedRights = true })],
+  ['legacy version', files => editDecisionBoth(files, decision => { decision.version = '1.7.1' })],
+  ['future version', files => editDecisionBoth(files, decision => { decision.version = '1.7.3' })],
+  ['unreviewed new asset', files => files.set('theme-resources/sources/outside-scope.png', sourceItem(Buffer.from('new asset')))],
+]
+for (const [name, mutate] of currentOwnerMutationCases) {
+  test(`1.7.2 direction rejects ${name}`, () => {
+    const files = ownerPublicationSnapshot('1.7.2')
+    mutate(files); rebuildSnapshotMetadata(files)
+    assert.throws(() => validateSnapshot(files, new Set(), '1.7.2'))
+  })
+}
+
+test('1.7.2 direction does not authorize a future release', () => {
+  const files = ownerPublicationSnapshot('1.7.2')
+  editSnapshotJson(files, MANIFEST, manifest => { manifest.version = '1.7.3' })
+  editSnapshotJson(files, REPORT, report => { report.version = '1.7.3' })
+  assert.throws(() => validateSnapshot(files, new Set(), '1.7.3'), /does not apply to release version/)
+})
+
+test('archive reader buffers independent historical and current release evidence', async () => {
+  const bytes = new Map([...snapshot(), [RIGHTS_AUDIT, json({ schemaVersion: 1, items: [] })],
+    [OWNER_EVIDENCE, evidenceBytes], [CURRENT_OWNER_EVIDENCE, currentEvidenceBytes]])
+  const { files } = await readSourceArchive(sourceZip(bytes), ROOT)
+  assert.deepEqual(files.get(OWNER_EVIDENCE).bytes, evidenceBytes)
+  assert.deepEqual(files.get(CURRENT_OWNER_EVIDENCE).bytes, currentEvidenceBytes)
 })
 
 const ownerMutationCases = [
@@ -578,8 +641,8 @@ test('build revision CLI preserves its exact immutable tag', () => {
 
 
 
-async function ownerPublicationBytes() {
-  const records = ownerPublicationSnapshot()
+async function ownerPublicationBytes(version = '1.7.1') {
+  const records = ownerPublicationSnapshot(version)
   for (const [name, item] of records) {
     if (item.bytes) continue
     const bytes = await readFile(new URL(`../${name}`, import.meta.url))
@@ -599,6 +662,20 @@ test('build revision preserves all 50 exact owner disclosures and pinned evidenc
   assert.equal(result.tag, tag)
   assert.equal(result.fileCount, files.size)
   assert.equal(JSON.parse(files.get(REPORT)).rightsDisclosures.length, 50)
+})
+
+test('1.7.2 complete corresponding source validates all 50 unchanged disclosures end to end', async (t) => {
+  const version = '1.7.2', tag = 'v1.7.2'
+  const files = withSourceReleaseTag(await ownerPublicationBytes(version), tag, version)
+  const directory = await localFixture(t, files)
+  const result = await verifyPublicSource({ ...options(directory), tag }, fakeGitHub(sourceZip(files), { tag }))
+  assert.equal(result.verified, true)
+  assert.equal(result.version, version)
+  assert.equal(result.tag, tag)
+  const report = JSON.parse(files.get(REPORT))
+  assert.equal(report.rightsDisclosures.length, 50)
+  assert.ok(report.rightsDisclosures.every(item => item.releaseDecision.retainsUnverifiedDisclosures === true
+    && !Object.hasOwn(item.releaseDecision, 'acknowledgesUnverifiedRights')))
 })
 
 test('build revision still rejects modified pinned owner evidence even with refreshed file metadata', async (t) => {
@@ -645,13 +722,38 @@ test('source-release metadata never bypasses package version consistency', async
   await assert.rejects(verifyPublicSource({ ...options(directory), tag }, { fetchImpl: async () => assert.fail('unexpected fetch') }), /package version/)
 })
 
-test('the installed source and license links reference the immutable package release tag', async () => {
+test('About displays one collapsed offline license notice and a copyable versioned address', async () => {
+  const { parse } = await import('vue/compiler-sfc')
   const metadata = JSON.parse(await readFile(new URL('../package.json', import.meta.url), 'utf8'))
   const component = await readFile(new URL('../src/components/新版主题.vue', import.meta.url), 'utf8')
-  assert.equal(metadata.version, '1.7.1')
-  assert.equal(metadata.sourceReleaseTag, 'v1.7.1-build.2')
-  assert.ok(component.includes('const releaseSourceUrl = `https://github.com/KKK-898/desktop-source-archive/tree/${packageMetadata.sourceReleaseTag}`'))
-  assert.ok(component.includes('const releaseLicenseUrl = `https://github.com/KKK-898/desktop-source-archive/blob/${packageMetadata.sourceReleaseTag}/LICENSE`'))
-  assert.ok(!component.includes('/tree/v${packageMetadata.version}'))
-  assert.ok(!component.includes('/blob/v${packageMetadata.version}/LICENSE'))
+  const { descriptor, errors } = parse(component)
+  assert.deepEqual(errors, [])
+  const script = descriptor.scriptSetup.content
+  assert.ok(/import\s+releaseLicenseText\s+from\s+['"]\.\.\/\.\.\/LICENSE\?raw['"]/.test(script), 'read the bundled LICENSE, not a remote page')
+  assert.ok(script.includes('const releaseLicenseUrl = `https://github.com/KKK-898/desktop-source-archive/blob/${packageMetadata.sourceReleaseTag}/LICENSE`'))
+  assert.equal(metadata.sourceReleaseTag.replace(/-build\.\d+$/, ''), `v${metadata.version}`)
+
+  function* elements(node) {
+    if (node.tag) yield node
+    for (const child of node.children || []) yield* elements(child)
+  }
+  const text = node => typeof node.content === 'string' ? node.content : (node.children || []).map(text).join('')
+  const hasClass = (node, name) => node.props.some(p => p.name === 'class' && p.value?.content.split(/\s+/).includes(name))
+  const only = (nodes, label) => { assert.equal(nodes.length, 1, label); return nodes[0] }
+  const panel = only([...elements(descriptor.template.ast)].filter(n => hasClass(n, 'new-theme-about-panel')), 'About panel')
+  const notice = only([...elements(panel)].filter(n => n.tag === 'details'), 'one disclosure in About')
+  assert.ok(hasClass(notice, 'new-theme-license-notice'))
+  assert.ok(!notice.props.some(p => p.name === 'open' || p.arg?.content === 'open'), 'collapsed by default')
+  const summary = only(notice.children.filter(n => n.tag === 'summary'), 'native disclosure control')
+  assert.equal(text(summary).trim(), '开源声明')
+  const content = [...elements(notice)]
+  const input = only(content.filter(n => n.tag === 'input'), 'copyable address')
+  assert.equal(input.props.find(p => p.name === 'type')?.value.content ?? 'text', 'text')
+  assert.ok(input.props.some(p => p.name === 'readonly'))
+  assert.ok(!input.props.some(p => p.name === 'disabled' || p.arg?.content === 'disabled'))
+  assert.ok(input.props.some(p => p.name === 'bind' && p.arg?.content === 'value' && p.exp?.content === 'releaseLicenseUrl'))
+  assert.match(only(content.filter(n => n.tag === 'pre'), 'bundled license text').loc.source, /\{\{\s*releaseLicenseText\s*\}\}/)
+  assert.match(text(notice), /源码[^。]*仓库[^。]*标签/)
+  assert.ok(!content.some(n => n.tag === 'a' || n.tag === 'button' || n.props.some(p => p.name === 'href' || p.arg?.content === 'href')))
+  assert.doesNotMatch(panel.loc.source, /openExternalUrl|获取本版本源码/)
 })

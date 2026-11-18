@@ -42,11 +42,15 @@ nativeTest('native scoped API hydration preserves only its reviewed shared compl
 
 nativeTest('native API hydration filters private atoms without relying on owner-state cleanup',async()=>{
  const privateValue={owner:'synthetic-private-owner'}
- const h=fixture.create({atoms:{...completedAtoms,'private-account-atom':privateValue}})
- // Do not call selectOwner: the host must filter an existing owner snapshot.
+ const previous={accountId:'synthetic-previous-account',userId:'synthetic-previous-user'}
+ const h=fixture.create({atoms:{...completedAtoms,'private-account-atom':privateValue},previousOwner:previous})
+ // A modern host must keep its original private snapshot until account
+ // selection is settled; reading via the renderer-filtered public getter
+ // would not establish that the on-disk-equivalent snapshot still exists.
+ if(fixture.ownerContract)h.setPendingAccountChange(Promise.resolve())
  const hydrated=JSON.parse(JSON.stringify(await h.hydrate()))
  assert.equal(hydrated['private-account-atom'],undefined)
- assert.deepEqual(h.globalState.get(atomsKey)['private-account-atom'],privateValue)
+ assert.deepEqual(h.globalState.state.get(atomsKey)['private-account-atom'],privateValue)
  if(fixture.preservesSharedApiAtoms){
   assert.equal(hydrated[completionKey],true)
   const principal={accountId:'synthetic-account',userId:'synthetic-user'}
@@ -54,7 +58,13 @@ nativeTest('native API hydration filters private atoms without relying on owner-
   const pending=JSON.parse(JSON.stringify(await h.hydrate()))
   assert.equal(pending['private-account-atom'],undefined)
   assert.equal(pending[completionKey],true)
-  assert.equal(h.globalState.get(ownerKey).owner,'synthetic-owner','Pending account changes must not select the cached owner')
+  if(fixture.ownerContract){
+   assert.equal(h.globalState.get(ownerKey),fixture.ownerContract.s6(previous),'Pending change keeps the previous native owner')
+   h.setPrincipal(null);h.setPendingAccountChange(null);await h.hydrate()
+   assert.equal(h.globalState.get(ownerKey),fixture.ownerContract.s6(null));assert.equal(h.persisted.TB('private-account-atom'),undefined)
+   h.selectOwner(previous)
+   assert.deepEqual(h.globalState.get(atomsKey)['private-account-atom'],privateValue,'Original owner can still recover its archived value')
+  }else assert.equal(h.globalState.get(ownerKey).owner,'synthetic-owner','Pending account changes must not select the cached owner')
  }
 })
 
@@ -89,7 +99,8 @@ nativeTest('native global sharing never imports a role, permission or account-ow
  assert.equal(h.persisted.TB(roleKey),undefined);assert.equal(h.persisted.TB('permission-synthetic'),undefined);assert.equal(h.persisted.TB('private-account-atom'),undefined)
  assert.deepEqual(h.persisted.TB('native-live-unrelated'),{preserve:true})
  assert.equal(JSON.stringify(h.globalState.get(atomsKey)),globalBefore)
- assert.equal(h.globalState.get(ownerKey).owner,null)
+ if(fixture.ownerContract)assert.equal(h.globalState.get(ownerKey),fixture.ownerContract.s6(null))
+ else assert.equal(h.globalState.get(ownerKey).owner,null)
 })
 
 nativeTest('native explicit onboarding replay remains authoritative',async()=>{
@@ -134,7 +145,17 @@ nativeTest('newer native completion is never replaced with an older receipt',asy
 
 nativeTest('unscoped native persistence needs no projection',async()=>{
  const h=fixture.create({accountScoped:false,atoms:completedAtoms});await h.hydrate()
- assert.equal(h.evaluate(),'app');assert.equal(restore(h).synchronize(receipt,()=>true).reason,'native-unscoped-persistence');assert.equal(h.publishes.length,0)
+ assert.equal(h.evaluate(),'app')
+ if(fixture.ownerContract){
+  const native=restore(h)
+  assert.equal(native.projectOwnerContract(),'content-owner')
+  assert.equal(native.synchronize(receipt,()=>true).reason,'native-completion-verified')
+  // An alleged opt-out without the reviewed preload cannot grant readiness.
+  const explicit=bind([h.record],{window:{electronBridge:{getInitialSidebarBootstrap:()=>({accountScopedPersistence:false})}}})
+  assert.equal(explicit.projectOwnerContract(),null)
+  assert.deepEqual(explicit.synchronize(receipt,()=>true),{ready:false,reason:'unknown-native-persistence'})
+ }else assert.equal(restore(h).synchronize(receipt,()=>true).reason,'native-unscoped-persistence')
+ assert.equal(h.publishes.length,0)
 })
 
 nativeTest('mode guard restores completion only under confirmed API identity through API/account/API cycle',async t=>{

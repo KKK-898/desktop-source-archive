@@ -323,19 +323,49 @@ function codexApiModeCommittedScopes(appScope, document) {
   return [...scopes.values()];
 }
 
-// Codex 26.1103 omits even its globally shared onboarding keys when an API
-// session has no authenticated ChatGPT principal. Project only a host-verified
-// completion receipt into the hydrated renderer; never replay onboarding or
-// copy account-scoped preferences, permissions or identity.
+// Project only a host-verified completion receipt into the hydrated renderer;
+// never replay onboarding or copy account-scoped preferences or identity.
 function codexApiModeLocalOnboardingBindings(records, options = {}) {
-  const stores = records.filter(record => record.source.includes('Persisted atom store accessed before initialization')
+  const stores = records.filter(record => typeof record?.source === 'string' && record.source.includes('Persisted atom store accessed before initialization')
     && record.source.includes('preservePendingPublishes') && record.source.includes('savedCustomSectionOperationIds'));
   const store = stores.length === 1 ? stores[0].exports : null;
   const supported = store && ['TB', 'JQ', 'jx', 'cz', 'Nj'].every(name => typeof store[name] === 'function')
     && /recordUpdate/.test(Function.prototype.toString.call(store.JQ))
     && /\.has\(/.test(Function.prototype.toString.call(store.TB));
+  // Bind the reviewed content-owner store to its actual loaded exports. A
+  // lookalike getter, local setter, or host-publishing setter is not evidence.
+  const modernStore = supported && ['A2', 'Ki', 'cz', 'Nj', 'TB', 'JQ', 'jx'].every(name =>
+    typeof store[name] === 'function' && stores[0].source.includes(name + ':' + Function.prototype.toString.call(store[name])))
+    && Function.prototype.toString.call(store.A2).includes('preservePendingPublishes')
+    && /\.get\(/.test(Function.prototype.toString.call(store.TB))
+    && /!1,void 0,/.test(Function.prototype.toString.call(store.JQ));
+  function persistenceContract(projectProbe = false) {
+    try {
+      const bridge = (options.window || globalThis.window)?.electronBridge;
+      const agent = bridge?.getDesktopUserAgent?.();
+      const legacy = typeof agent === 'string' && /^Codex Desktop\/26\.1103\.(?:32239|60933) \([^)]+\)$/.test(agent);
+      const modern = typeof agent === 'string' && /^Codex Desktop\/26\.1111\.21308 \([^)]+\)$/.test(agent);
+      // The modern sidebar bootstrap reads projects; neither a completion
+      // receipt nor a project-ownership probe needs that data.
+      if (modern) return projectProbe || modernStore ? 'content-owner' : null;
+      if (!legacy) return null;
+      const bootstrap = bridge?.getInitialSidebarBootstrap?.();
+      if (!bootstrap || typeof bootstrap !== 'object') return null;
+      if (Object.hasOwn(bootstrap, 'accountScopedPersistence')) {
+        const scoped = bootstrap.accountScopedPersistence;
+        if (typeof scoped !== 'boolean') return null;
+        if (!scoped) return 'unscoped';
+        return 'renderer-owner';
+      }
+    } catch { /* An unavailable native bridge is not evidence of a storage scope. */ }
+    return null;
+  }
   let lastApplied = '';
   return {
+    projectOwnerContract() {
+      const contract = persistenceContract(true);
+      return contract === 'renderer-owner' || contract === 'content-owner' ? contract : null;
+    },
     hostReady: () => Boolean(supported && store.cz() === 'host'),
     publishProjectCheckpoint(marker, isCurrent) {
       if (!supported) return { ready: false, reason: 'unsupported-native-persistence' };
@@ -353,40 +383,43 @@ function codexApiModeLocalOnboardingBindings(records, options = {}) {
     },
     synchronize(snapshot, isCurrent) {
       if (!snapshot) return { ready: true, reason: 'not-recorded' };
-      if (snapshot.projectlessCompleted !== true || !Number.isSafeInteger(snapshot.completedAt)
+      if (!Object.hasOwn(snapshot, 'projectlessCompleted') || !Object.hasOwn(snapshot, 'completedAt')
+          || snapshot.projectlessCompleted !== true || !Number.isSafeInteger(snapshot.completedAt)
           || snapshot.completedAt <= 0 || snapshot.completedAt > 253402300799) {
         return { ready: false, reason: 'invalid-completion-record' };
       }
       if (!supported) return { ready: false, reason: 'unsupported-native-persistence' };
-      const browser = options.window || globalThis.window;
-      if (browser?.electronBridge?.getInitialSidebarBootstrap?.()?.accountScopedPersistence !== true) {
-        return { ready: true, reason: 'native-unscoped-persistence' };
-      }
+      const contract = persistenceContract();
+      if (!contract) return { ready: false, reason: 'unknown-native-persistence' };
       if (store.cz() !== 'host') return { ready: false, reason: 'awaiting-host-hydration' };
       if (!isCurrent()) return { ready: false, reason: 'identity-changed' };
-      const override = store.TB('electron:onboarding-override', 'auto');
-      if (override != null && override !== 'auto') return { ready: true, reason: 'explicit-native-override' };
       const completionKey = 'electron:onboarding-projectless-completed';
       const timeKey = 'last_completed_onboarding';
+      const generation = store.Nj();
+      if (!Number.isSafeInteger(generation) || generation <= 0) return { ready: false, reason: 'awaiting-host-hydration' };
+      const current = () => isCurrent() && store.cz() === 'host' && store.Nj() === generation;
+      const override = store.TB('electron:onboarding-override', 'auto');
+      if (override != null && override !== 'auto') return { ready: true, reason: 'explicit-native-override' };
       const currentTime = store.TB(timeKey, null);
       if (currentTime != null && (!Number.isSafeInteger(currentTime) || currentTime <= 0 || currentTime > 253402300799)) {
         return { ready: false, reason: 'invalid-native-completion-time' };
       }
       if (store.TB(completionKey, false) === true && currentTime >= snapshot.completedAt) {
-        return { ready: true, reason: 'native-completion-verified' };
+        return { ready: current(), reason: contract === 'unscoped' ? 'native-unscoped-persistence' : 'native-completion-verified' };
       }
-      const receipt = JSON.stringify([store.Nj(), snapshot.completedAt]);
+      if (contract === 'unscoped') return { ready: false, reason: 'unverified-native-completion' };
+      const receipt = JSON.stringify([generation, snapshot.completedAt]);
       // A native reset after projection wins until a new host hydration or a
       // newer genuine completion receipt. Do not fight interactive resets.
       if (lastApplied === receipt) return { ready: true, reason: 'native-reset-preserved' };
-      if (!isCurrent()) return { ready: false, reason: 'identity-changed' };
+      if (!current()) return { ready: false, reason: 'identity-changed' };
       // JQ is the native per-key external-update path. Unlike jx, it does not
       // publish a write to the host; all other live atoms stay untouched.
       store.JQ(timeKey, Math.max(currentTime || 0, snapshot.completedAt));
-      if (!isCurrent()) return { ready: false, reason: 'identity-changed' };
+      if (!current()) return { ready: false, reason: 'identity-changed' };
       store.JQ(completionKey, true);
       lastApplied = receipt;
-      return { ready: store.TB(completionKey, false) === true && store.TB(timeKey, 0) >= snapshot.completedAt,
+      return { ready: current() && store.TB(completionKey, false) === true && store.TB(timeKey, 0) >= snapshot.completedAt,
         reason: 'shared-completion-restored' };
     },
   };

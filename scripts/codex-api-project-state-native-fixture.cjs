@@ -2,21 +2,54 @@ const assert = require('node:assert/strict')
 const vm = require('node:vm')
 const path = require('node:path')
 const { EventEmitter } = require('node:events')
+const { createHash } = require('node:crypto')
 const asar = require('@electron/asar')
 const ts = require('typescript')
 const { nativeOnboardingFixture } = require('./codex-api-onboarding-native-fixture.cjs')
+
+// Ask the host which global keys are actually partitioned, without querying
+// a catalog, a conversation or a previous principal's storage.
+function contentOwnerProjectBoundary(packagePath, onboarding = nativeOnboardingFixture(packagePath)) {
+  const { globalKeys, ownerContract, rpcExports } = onboarding
+  assert.ok(Array.isArray(ownerContract?.O), 'native content-owner scoped-key registry')
+  const projectKeys = ['LOCAL_PROJECTS', 'THREAD_PROJECT_ASSIGNMENTS', 'PROJECTLESS_THREAD_IDS'].map(name => globalKeys[name])
+  assert.ok(projectKeys.every(key => typeof key === 'string'), 'native project keys')
+  const scoped = new Set(ownerContract.O)
+  for (const name of ['WORKSPACE_ROOT_OPTIONS', 'WORKSPACE_ROOT_LABELS']) {
+    assert.ok(scoped.has(globalKeys[name]), 'native scope registry covers ' + name)
+  }
+  const unscopedKeys = projectKeys.filter(key => !scoped.has(key))
+  function nativeApplicationState(read, write) {
+    const filename = path.join('.vite', 'build', 'early-bootstrap-331-29198f5b57adf59a.js')
+    const source = asar.extractFile(packagePath, filename).toString()
+    const tree = ts.createSourceFile(filename, source, ts.ScriptTarget.Latest, true, ts.ScriptKind.JS)
+    const found = []
+    const visit = node => {
+      if (ts.isClassDeclaration(node) && node.name?.text === 'KD') found.push(node.getText(tree))
+      ts.forEachChild(node, visit)
+    }
+    visit(tree)
+    assert.equal(found.length, 1, 'reviewed native application-state service')
+    assert.equal(createHash('sha256').update(found[0]).digest('hex'),
+      'd4fc10e2dbfc4b86a2ddc0e69b97ef25370b81dfac8e9dc400cc1165e7254e2b', 'unreviewed application-state service')
+    const NativeService = vm.runInThisContext('(function(e0,e1){return (' + found[0] + ')})')(rpcExports, {Q2Y: globalKeys})
+    return new rpcExports.AX(new NativeService(read, write))
+  }
+  return { onboarding, projectKeys, unscopedKeys, nativeApplicationState }
+}
 
 // Reviewed native main-process classes execute against memory. Schema/path
 // primitives accept only synthetic validated inputs; no Electron entry point,
 // auth reader, database, filesystem mutation or real network is executed.
 function nativeProjectStateFixture(packagePath) {
+  const packageVersion=JSON.parse(asar.extractFile(packagePath,'package.json').toString()).version
+  assert.ok(['26.1103.32239','26.1103.60933'].includes(packageVersion),
+    'Main-process project state is unverified on Codex '+packageVersion+'; this fixture requires a reviewed renderer owner and project RPC contract')
   const onboarding = nativeOnboardingFixture(packagePath)
   const files = asar.listPackage(packagePath).map(file => file.replace(/^[\\/]/, ''))
   const sources = files.filter(file => /\.vite[\\/]build[\\/].*\.js$/.test(file))
     .map(file => [file, asar.extractFile(packagePath, file).toString()])
   const classes = {}, functions = {}, methods = {}, modules = {}
-  const packageVersion=JSON.parse(asar.extractFile(packagePath,'package.json').toString()).version
-  assert.ok(['26.1103.32239','26.1103.60933'].includes(packageVersion),'Unreviewed native main package '+packageVersion)
   const modern=packageVersion==='26.1103.60933'
   const classMap=modern?{GW:'GB',DA:'DV',N5:'N6',efm:'efC',dE:'dE',ed4:'eua',ed8:'euo',eui:'eum',eul:'euy',eRW:'eRM'}:{GW:'GW',DA:'DA',N5:'N5',efm:'efm',dE:'dE',ed4:'ed4',ed8:'ed8',eui:'eui',eul:'eul',eRW:'eRW'}
   const classNames=new Set(Object.keys(classMap))
@@ -123,4 +156,4 @@ function nativeProjectStateFixture(packagePath) {
   }
   return {create,connect,onboarding,native,source:{classes,functions,methods}}
 }
-module.exports={nativeProjectStateFixture}
+module.exports={nativeProjectStateFixture,contentOwnerProjectBoundary}

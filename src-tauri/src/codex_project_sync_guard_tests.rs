@@ -278,3 +278,33 @@ fn api_onboarding_bridge_uses_only_active_home_shared_completion_for_pure_api() 
         assert!(codex_fuel_runtime_state().get("apiLocalOnboarding").is_none());
     });
 }
+
+#[test]
+fn api_onboarding_bridge_does_not_export_stale_json_after_native_storage_migration() {
+    with_temp_user_home("api-onboarding-native-db", |root| {
+        let home = root.join("isolated-active-home");
+        fs::create_dir_all(&home).unwrap();
+        std::env::set_var("CODEX_HOME", &home);
+        fs::write(home.join("auth.json"), build_codex_api_auth("synthetic-api-key").to_string()).unwrap();
+        let json_path = home.join(".codex-global-state.json");
+        let historical = json!({"electron-persisted-atom-state": {
+            "electron:onboarding-projectless-completed": true, "last_completed_onboarding": 200
+        }}).to_string();
+        fs::write(&json_path, &historical).unwrap();
+        // Only the active home is relevant, even if a different home has migrated.
+        let other = codex_dir();
+        fs::create_dir_all(&other).unwrap();
+        fs::write(other.join(".codex-global-state.sqlite"), b"inactive").unwrap();
+        assert_eq!(codex_fuel_runtime_state()["apiLocalOnboarding"], json!({"projectlessCompleted":true,"completedAt":200}));
+        for name in [".codex-global-state.sqlite", ".codex-global-state.sqlite-wal",
+            ".codex-global-state.sqlite-shm", ".codex-global-state.sqlite-journal"] {
+            let path = home.join(name);
+            let sentinel = b"opaque native store";
+            fs::write(&path, sentinel).unwrap();
+            assert!(codex_fuel_runtime_state().get("apiLocalOnboarding").is_none(), "{name}");
+            assert_eq!(fs::read(&path).unwrap(), sentinel);
+            assert_eq!(fs::read_to_string(&json_path).unwrap(), historical);
+            fs::remove_file(&path).unwrap();
+        }
+    });
+}

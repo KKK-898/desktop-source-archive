@@ -60,6 +60,36 @@ test('API mode independently polls when Ultra is disabled and its status RPC is 
   assert.equal(h.timers.size, 0)
 })
 
+test('unverified project scope stops API feedback polling without hiding the independent Ultra or Fast result', async t => {
+  const api = { ...pendingApi, reason: 'unsupported-local-project-scope' }
+  const fast = { enabled: true, ready: true, verified: true, compiled: true, reason: 'compiled' }
+  const h = feedbackHarness(t, {
+    getCodexApiModeStatus: async () => api,
+    getCodexUltraStatus: async () => verifiedUltra,
+  })
+  h.showCodexLaunchFeedback({ ultra: pendingUltra, apiMode: pendingApi, nativeFast: fast }, 'Codex 已重新打开。')
+  await h.advance()
+  const warning = h.state.toolWarnings.value.codex
+  assert.match(warning, /本次未改动项目分组/)
+  assert.doesNotMatch(warning, /正在重试|正在验证|纯 API 登录已使用/)
+  assert.match(warning, /Ultra 已通过本次检查/)
+  assert.match(warning, /原生 Fast 入口已通过本次检查/)
+  assert.equal(h.timers.size, 0)
+  const feedback = h.codexApiModeFeedback({ apiMode: { ...api, error: 'private-path' } })
+  assert.equal(feedback.pending, false)
+  assert.doesNotMatch(feedback.warning, /private-path/)
+})
+
+test('a transient native project delay keeps polling and can later verify Coding', async t => {
+  const h = feedbackHarness(t, { getCodexApiModeStatus: async () => verifiedApi })
+  const apiMode = { ...pendingApi, reason: 'awaiting-native-local-projects' }
+  assert.equal(h.codexApiModeFeedback({ apiMode }).pending, true)
+  h.showCodexLaunchFeedback({ apiMode }, 'Codex 已重新打开。')
+  await h.advance()
+  assert.match(h.state.toolNotices.value.codex, apiSuccess)
+  assert.equal(h.timers.size, 0)
+})
+
 test('verified API mode and Ultra results are combined after both current RPCs finish', async t => {
   const apiRead = deferred()
   let ultraReads = 0, apiReads = 0

@@ -4,7 +4,9 @@ Source: https://github.com/BigPizzaV3/CodexPlusPlus
 
 Pinned revision: ce1767a1a24ac9dc6b9c0f95bed1648d944c89e1
 
-Vendored files: assets/inject/native-fast-unlock.js and assets/inject/native-fast-rspack.js. These files are retained from that revision.
+Vendored files: assets/inject/native-fast-unlock.js and assets/inject/native-fast-rspack.js. These files are retained from that base revision, with the following narrowly backported upstream fix.
+
+Native Fast compatibility fix: `e5567301196fbfadd9184d77aea4b4980c5f1f77` (2026-11-13), https://github.com/BigPizzaV3/CodexPlusPlus/commit/e5567301196fbfadd9184d77aea4b4980c5f1f77. `native-fast-unlock.js` now inspects up to 12 entry scripts instead of 4 so Codex 26.1111's fifth-entry Rspack runtime is not missed (issue #3103). The matching regression is adapted in `scripts/codex-native-fast-rspack.test.cjs`; `native-fast-rspack.js` and the other integrations below remain at their independently stated revisions.
 
 The upstream project declares GNU Affero General Public License version 3; its complete license is retained in LICENSE alongside these files. The Gaoge integration wrapper and native startup lifecycle are separate local files.
 

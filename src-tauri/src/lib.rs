@@ -124,13 +124,15 @@ const CODEX_MODEL_SELECTION_ORIGIN_USER: &str = "user";
 const CODEX_MODEL_CATALOG_SOURCE_UPSTREAM: &str = "upstream";
 const CODEX_MODEL_CATALOG_SOURCE_FALLBACK: &str = "fallback";
 const CODEX_FALLBACK_MODELS: [&str; 4] = ["gpt-6-astra", "gpt-5.5", "gpt-5.6-sol", "gpt-5.6-terra"];
-const CODEX_FAST_MODELS: [&str; 6] = [
+const CODEX_FAST_MODELS: [&str; 8] = [
     "gpt-5.5",
     "gpt-5.6-sol",
     "gpt-5.6-terra",
     "gpt-6-astra",
     "gpt-6-sol",
     "gpt-6.1-sol",
+    "gpt-6.2-astra",
+    "gpt-6.2-sol",
 ];
 const CLAUDE_FALLBACK_MODELS: [&str; 6] = [
     "claude-opus-4-6",
@@ -197,7 +199,7 @@ const OPENAI_CODEX_OAUTH_REDIRECT_URI: &str = "http://localhost:1455/auth/callba
 const OPENAI_CODEX_OAUTH_SCOPES: &str =
     "openid profile email offline_access api.connectors.read api.connectors.invoke";
 const OPENAI_CODEX_OAUTH_ORIGINATOR: &str = "codex_vscode";
-const GAOGE_USER_AGENT: &str = "GaogeAii/1.7.1";
+const GAOGE_USER_AGENT: &str = "GaogeAii/1.7.2";
 // This is a total budget shared by every compatible `/models` endpoint.
 const MODEL_FETCH_TIMEOUT_SECS: u64 = 6;
 const ACCOUNT_USAGE_TIMEOUT_SECS: u64 = 8;
@@ -2065,11 +2067,12 @@ fn codex_catalog_reasoning_effort(catalog: &Value, model: &str, requested: Optio
         .map(|levels| {
             levels
                 .iter()
-                .filter_map(|level| level.get("effort").and_then(Value::as_str))
+                .filter_map(codex_reasoning_level_effort)
                 .collect::<Vec<_>>()
         })
         .unwrap_or_default();
-    if model.starts_with("gaoge/") && supported.is_empty() {
+    if supported.is_empty() && (model.starts_with("gaoge/")
+        || entry.get("supported_reasoning_levels").is_some_and(Value::is_array)) {
         return "none".to_string();
     }
     if supported.iter().any(|effort| *effort == requested) {
@@ -2293,7 +2296,10 @@ fn is_aggregate_openai_provider(provider_id: &str) -> bool {
 
 fn codex_openai_speed_profile(model: &str) -> Option<AggregateSpeedProfile> {
     let model = canonical_model_name(&normalized_aggregate_model_name(model));
-    if codex_speed_release_matches(&model, "gpt-6.1-sol") {
+    // Current relay models keep native Fast even when an older server sends only IDs.
+    if ["gpt-6.1-sol", "gpt-6.2-astra", "gpt-6.2-sol"]
+        .iter().any(|release| codex_speed_release_matches(&model, release))
+    {
         return Some(AggregateSpeedProfile {
             name: "Fast",
             description: "Faster responses, increased usage",
@@ -2409,7 +2415,20 @@ fn apply_speed_profile_to_model_entry(entry: &mut Value, profile: Option<Aggrega
 }
 
 fn reconcile_codex_speed_tiers(object: &mut Map<String, Value>, model: &str) {
-    let Some(profile) = codex_openai_speed_profile(model) else {
+    let declared = desktop_model_support::entry_override(object, "supportsFast");
+    if declared == Some(false) {
+        for key in ["additional_speed_tiers", "service_tiers", "additionalSpeedTiers", "serviceTiers"] {
+            if let Some(tiers) = object.get_mut(key).and_then(Value::as_array_mut) {
+                tiers.retain(|tier| ![tier.as_str(), tier["id"].as_str(), tier["value"].as_str()]
+                    .into_iter().flatten().any(|id| matches!(id.trim().to_ascii_lowercase().as_str(), "fast" | "priority")));
+            }
+        }
+        return;
+    }
+    let Some(profile) = (if declared == Some(true) {
+        Some(AggregateSpeedProfile { name: "Fast", description: "Priority processing when supported by upstream",
+            picker_label: "快速（需上游支持）", transport: AggregateSpeedTransport::OpenAiPriority })
+    } else { codex_openai_speed_profile(model) }) else {
         return;
     };
     // Native caches can contain complete model metadata but empty speed lists.
@@ -2474,6 +2493,11 @@ fn aggregate_glm_reasoning_efforts() -> &'static [&'static str] {
     &["low", "medium", "high"]
 }
 
+fn codex_reasoning_level_effort(level: &Value) -> Option<&str> {
+    level.as_str().or_else(|| level.get("effort").and_then(Value::as_str))
+        .or_else(|| level.get("reasoningEffort").and_then(Value::as_str))
+}
+
 fn codex_reasoning_level_entry(effort: &str) -> Value {
     let description = match effort {
         "low" => "Fast responses with lighter reasoning",
@@ -2531,7 +2555,8 @@ fn codex_model_caps_reasoning_at_xhigh(slug: &str) -> bool {
 
 fn codex_model_supports_ultra_reasoning(slug: &str) -> bool {
     let canonical = canonical_codex_catalog_model_name(slug);
-    ["gpt-5.6-sol", "gpt-5.6-terra", "gpt-6-astra", "gpt-6-sol", "gpt-6.1-sol"]
+    ["gpt-5.6-sol", "gpt-5.6-terra", "gpt-6-astra", "gpt-6-sol", "gpt-6.1-sol",
+        "gpt-6.2-astra", "gpt-6.2-sol"]
         .iter()
         .any(|release| codex_speed_release_matches(&canonical, release))
 }
@@ -2546,6 +2571,31 @@ fn codex_model_caps_reasoning_at_max(slug: &str) -> bool {
 fn reconcile_codex_reasoning_levels(entry: &mut Map<String, Value>, slug: &str) {
     let capped_at_xhigh = codex_model_caps_reasoning_at_xhigh(slug);
     let capped_at_max = codex_model_caps_reasoning_at_max(slug);
+    if let Some(declared) = desktop_model_support::entry_override(entry, "supportsUltra") {
+        let non_reasoning = entry.get("supported_reasoning_levels").and_then(Value::as_array)
+            .is_some_and(|levels| levels.is_empty() || levels.iter().all(|level| codex_reasoning_level_effort(level) == Some("none")));
+        if declared && non_reasoning { return; }
+        for key in ["supported_reasoning_levels", "supportedReasoningEfforts", "supported_reasoning_efforts"] {
+            if let Some(levels) = entry.get_mut(key).and_then(Value::as_array_mut) {
+                if !declared { levels.retain(|level| codex_reasoning_level_effort(level) != Some("ultra")); }
+            }
+        }
+        if declared {
+            let levels = entry.entry("supported_reasoning_levels").or_insert_with(|| json!([]));
+            if let Some(levels) = levels.as_array_mut() {
+                for effort in ["max", "ultra"] {
+                    if !levels.iter().any(|level| codex_reasoning_level_effort(level) == Some(effort)) { levels.push(codex_reasoning_level_entry(effort)); }
+                }
+            }
+        } else if entry.get("default_reasoning_level").and_then(Value::as_str) == Some("ultra") {
+            let fallback = entry.get("supported_reasoning_levels").and_then(Value::as_array)
+                .into_iter().flatten().filter_map(codex_reasoning_level_effort)
+                .filter_map(|effort| codex_reasoning_effort_rank(effort).map(|rank| (rank, effort.to_string())))
+                .max_by_key(|(rank, _)| *rank).map(|(_, effort)| effort).unwrap_or_else(|| "none".into());
+            entry.insert("default_reasoning_level".into(), json!(fallback));
+        }
+        return;
+    }
     let supports_ultra = codex_model_supports_ultra_reasoning(slug);
     if !capped_at_xhigh && !capped_at_max && !supports_ultra {
         return;
@@ -2560,7 +2610,7 @@ fn reconcile_codex_reasoning_levels(entry: &mut Map<String, Value>, slug: &str) 
     // An explicit empty/none-only list is a non-reasoning declaration, not a
     // stale ceiling. Never turn it into a reasoning model during repair.
     if levels.is_empty()
-        || levels.iter().all(|level| level.get("effort").and_then(Value::as_str) == Some("none"))
+        || levels.iter().all(|level| codex_reasoning_level_effort(level) == Some("none"))
     {
         return;
     }
@@ -2577,7 +2627,7 @@ fn reconcile_codex_reasoning_levels(entry: &mut Map<String, Value>, slug: &str) 
     for optional in ["none", "minimal"] {
         if let Some(index) = existing
             .iter()
-            .position(|level| level.get("effort").and_then(Value::as_str) == Some(optional))
+            .position(|level| codex_reasoning_level_effort(level) == Some(optional))
         {
             reconciled.push(existing.remove(index));
         }
@@ -2585,7 +2635,7 @@ fn reconcile_codex_reasoning_levels(entry: &mut Map<String, Value>, slug: &str) 
     for effort in target_efforts {
         if let Some(index) = existing
             .iter()
-            .position(|level| level.get("effort").and_then(Value::as_str) == Some(*effort))
+            .position(|level| codex_reasoning_level_effort(level) == Some(*effort))
         {
             reconciled.push(existing.remove(index));
         } else {
@@ -2595,7 +2645,7 @@ fn reconcile_codex_reasoning_levels(entry: &mut Map<String, Value>, slug: &str) 
     if supports_ultra {
         reconciled.extend(existing.into_iter().filter(|level| {
             !matches!(
-                level.get("effort").and_then(Value::as_str),
+                codex_reasoning_level_effort(level),
                 Some("none" | "minimal" | "low" | "medium" | "high" | "xhigh" | "max" | "ultra")
             )
         }));
@@ -2604,7 +2654,7 @@ fn reconcile_codex_reasoning_levels(entry: &mut Map<String, Value>, slug: &str) 
 
     let supported = levels
         .iter()
-        .filter_map(|level| level.get("effort").and_then(Value::as_str))
+        .filter_map(codex_reasoning_level_effort)
         .map(ToString::to_string)
         .collect::<Vec<_>>();
     let default_is_supported = entry
@@ -2799,6 +2849,7 @@ fn codex_model_metadata_is_complete(entry: &Value) -> bool {
 }
 
 fn sanitize_codex_model_metadata(mut entry: Value, slug: &str) -> Option<Value> {
+    if let Some(object) = entry.as_object_mut() { desktop_model_support::restore_entry_capabilities(object); }
     if !codex_model_metadata_is_complete(&entry) {
         return None;
     }
@@ -2830,6 +2881,13 @@ fn sanitize_codex_model_metadata(mut entry: Value, slug: &str) -> Option<Value> 
 }
 
 fn reconcile_codex_multi_agent_version(entry: &mut Map<String, Value>, slug: &str) {
+    if let Some(declared) = desktop_model_support::entry_override(entry, "supportsUltra") {
+        if declared && entry.get("supported_reasoning_levels").and_then(Value::as_array)
+            .is_some_and(|levels| levels.iter().any(|level| codex_reasoning_level_effort(level) == Some("ultra"))) {
+            entry.insert("multi_agent_version".into(), json!("v2"));
+        }
+        return;
+    }
     // Native Ultra uses maximum reasoning plus proactive delegation. Stripping
     // v2 silently falls back to the legacy tools and loses that behavior even
     // when the picker still offers Ultra. Only supply a fallback for known
@@ -5443,47 +5501,47 @@ fn codex_model_entry_declares_speed(entry: &Value) -> bool {
         || has_fast_tier(entry.get("serviceTiers"))
 }
 
+fn codex_api_speed_catalog(config: &str) -> Option<Value> {
+    let path = PathBuf::from(configured_root_value(config, "model_catalog_json")?);
+    let path = if path.is_absolute() { path } else { codex_fuel_runtime_config_path().parent()?.join(path) };
+    read_json_if_exists(&path).ok().flatten()
+}
+
 fn codex_api_speed_model_ids(config: &str) -> Vec<String> {
+    let catalog = codex_api_speed_catalog(config);
+    let entries = catalog.as_ref().and_then(|catalog| catalog["models"].as_array());
     let mut models: Vec<String> = Vec::new();
-    let mut add = |model: &str| {
-        let model = model.trim();
-        if model.is_empty()
-            || models.iter().any(|known| {
-                normalized_codex_speed_model_name(known) == normalized_codex_speed_model_name(model)
-            })
-        {
-            return;
-        }
-        models.push(model.to_string());
-    };
     for model in CODEX_FAST_MODELS {
-        if codex_openai_speed_profile(model).is_some() {
-            add(model);
-        }
+        let explicitly_disabled = entries.into_iter().flatten()
+            .find(|entry| entry["slug"].as_str() == Some(model))
+            .and_then(|entry| entry.as_object())
+            .and_then(|entry| desktop_model_support::entry_override(entry, "supportsFast")) == Some(false);
+        if !explicitly_disabled && codex_openai_speed_profile(model).is_some() { models.push(model.to_string()); }
     }
-    if let Some(path) = configured_root_value(config, "model_catalog_json") {
-        if let Ok(Some(catalog)) = read_json_if_exists(Path::new(&path)) {
-            if let Some(entries) = catalog.get("models").and_then(Value::as_array) {
-                for entry in entries {
-                    if codex_model_entry_declares_speed(entry) {
-                        if let Some(model) = entry.get("slug").and_then(Value::as_str) {
-                            add(model);
-                        }
-                    }
-                }
-            }
-        }
+    for entry in entries.into_iter().flatten() {
+        let Some(model) = entry["slug"].as_str() else { continue; };
+        let supported = entry.as_object().and_then(|entry| desktop_model_support::entry_override(entry, "supportsFast"))
+            .unwrap_or_else(|| codex_model_entry_declares_speed(entry));
+        if supported && !models.iter().any(|known| known == model) { models.push(model.to_string()); }
     }
     models
 }
 
 fn codex_api_speed_model_supported(config: &str, model: &str) -> bool {
+    let catalog = codex_api_speed_catalog(config);
+    let entries = catalog.as_ref().and_then(|catalog| catalog["models"].as_array());
+    if let Some(declared) = entries.into_iter().flatten().find(|entry| entry["slug"].as_str() == Some(model))
+        .and_then(Value::as_object).and_then(|entry| desktop_model_support::entry_override(entry, "supportsFast")) {
+        return declared;
+    }
     let requested = normalized_codex_speed_model_name(model);
-    !requested.is_empty()
-        && (codex_openai_speed_profile(&requested).is_some()
-            || codex_api_speed_model_ids(config)
-                .iter()
-                .any(|known| normalized_codex_speed_model_name(known) == requested))
+    !requested.is_empty() && (codex_openai_speed_profile(&requested).is_some()
+        || entries.into_iter().flatten().any(|entry| {
+            let exact = entry["slug"].as_str() == Some(model);
+            let has_override = entry.as_object().and_then(|entry| desktop_model_support::entry_override(entry, "supportsFast")).is_some();
+            (exact || (!has_override && entry["slug"].as_str().is_some_and(|known| normalized_codex_speed_model_name(known) == requested)))
+                && codex_model_entry_declares_speed(entry)
+        }))
 }
 
 fn codex_fuel_runtime_state() -> Value {
@@ -5515,7 +5573,15 @@ fn codex_fuel_runtime_state() -> Value {
     state["apiCodingModeEnabled"] = json!(api_coding_mode_enabled);
     if api_coding_mode_enabled {
         let path = codex_fuel_runtime_config_path().with_file_name(".codex-global-state.json");
-        let native_state = read_json_if_exists(&path).ok().flatten();
+        // Once the native host migrates, its old JSON is not an onboarding
+        // receipt. Check on both sides of the read without opening the database.
+        let native_state = path.parent().and_then(|home| {
+            if codex_project_compat::has_native_global_state_db(home) {
+                return None;
+            }
+            let state = read_json_if_exists(&path).ok()??;
+            (!codex_project_compat::has_native_global_state_db(home)).then_some(state)
+        });
         if let Some(onboarding) = codex_api_mode::local_onboarding(native_state.as_ref()) {
             state["apiLocalOnboarding"] = onboarding;
         }
@@ -11755,16 +11821,33 @@ fn codex_plugin_cdp_script(
     return urls.find((url) => url.includes("/assets/") && url.includes(namePart) && url.split("?")[0].endsWith(".js")) || "";
   }
 
-  async function loadCodexAppModule(namePart) {
+  async function loadCodexAppModule(namePart, options = null) {
+    const guarded = options != null;
+    const expectedUrl = guarded ? options.expectedUrl : "";
+    const valid = () => {
+      if (!guarded) return true;
+      try {
+        return typeof expectedUrl === "string" && expectedUrl.length > 0
+          && typeof options.validate === "function" && options.validate(expectedUrl) === true;
+      } catch (_) { return false; }
+    };
+    // Guarded callers import the exact previously reviewed URL. Keep their
+    // cache separate from legacy filename-only callers and revalidate reuse.
+    if (!valid()) return null;
+    const cacheKey = guarded ? "guarded:" + expectedUrl : namePart;
     window.__gaogeCodexPluginModulePromises = window.__gaogeCodexPluginModulePromises || new Map();
-    if (!window.__gaogeCodexPluginModulePromises.has(namePart)) {
+    const cache = window.__gaogeCodexPluginModulePromises;
+    if (!cache.has(cacheKey)) {
       const promise = (async () => {
         let timer;
         try {
           return await Promise.race([
             Promise.resolve().then(async () => {
-              const url = codexAppAssetUrl(namePart);
+              const url = guarded ? expectedUrl : codexAppAssetUrl(namePart);
               if (!url) throw new Error(`Codex App asset not found: ${namePart}`);
+              // This check belongs immediately next to import, not merely at
+              // the caller before this microtask is scheduled.
+              if (!valid()) return null;
               return await import(url);
             }),
             new Promise((_, reject) => {
@@ -11774,17 +11857,19 @@ fn codex_plugin_cdp_script(
         } finally {
           clearTimeout(timer);
         }
-      })().catch((error) => {
+      })().then((module) => {
+        if (module === null && cache.get(cacheKey) === promise) cache.delete(cacheKey);
+        return module;
+      }).catch((error) => {
         // An abandoned import may settle after a retry has installed a newer
         // promise. It must never evict that replacement or block every retry.
-        if (window.__gaogeCodexPluginModulePromises.get(namePart) === promise) {
-          window.__gaogeCodexPluginModulePromises.delete(namePart);
-        }
+        if (cache.get(cacheKey) === promise) cache.delete(cacheKey);
         throw error;
       });
-      window.__gaogeCodexPluginModulePromises.set(namePart, promise);
+      cache.set(cacheKey, promise);
     }
-    return await window.__gaogeCodexPluginModulePromises.get(namePart);
+    const module = await cache.get(cacheKey);
+    return valid() ? module : null;
   }
 
   function restorePluginMarketplaceName(name) {
@@ -24590,7 +24675,11 @@ fn sync_codex_global_state_projects(
     deleted_ids: &HashSet<String>,
     hidden_session_ids: &HashSet<String>,
 ) -> Result<CodexGlobalStateSyncResult, String> {
-    let path = codex_dir().join(".codex-global-state.json");
+    let home = codex_dir();
+    if codex_project_compat::has_native_global_state_db(&home) {
+        return Ok(CodexGlobalStateSyncResult::default());
+    }
+    let path = home.join(".codex-global-state.json");
     let original = read_text_if_exists(&path)?;
     if original.trim().is_empty() {
         return Ok(CodexGlobalStateSyncResult::default());
@@ -24730,7 +24819,8 @@ fn sync_codex_global_state_projects(
     let next = serde_json::to_string_pretty(&state)
         .map_err(|error| format!("Failed to encode {}: {error}", path.display()))?
         + "\n";
-    if !write_text_if_unchanged(&path, &next, &guard)? {
+    if codex_project_compat::has_native_global_state_db(&home)
+        || !write_text_if_unchanged(&path, &next, &guard)? {
         return Ok(CodexGlobalStateSyncResult {
             warning: format!(
                 "{} changed while sessions were synchronizing; project assignments were not overwritten.",
@@ -27084,8 +27174,9 @@ fn sync_native_project_memberships_with_exit_recheck(
     exit_was_confirmed: bool,
     fresh_probe: impl FnOnce() -> Result<Vec<PathBuf>, String>,
 ) -> codex_project_compat::ProjectCompatReport {
-    let native_projects_owned = read_json_if_exists(&home.join(".codex-global-state.json"))
-        .ok().flatten().as_ref().is_some_and(codex_project_compat::has_native_project_state);
+    let native_projects_owned = codex_project_compat::has_native_global_state_db(home)
+        || read_json_if_exists(&home.join(".codex-global-state.json"))
+            .ok().flatten().as_ref().is_some_and(codex_project_compat::has_native_project_state);
     // Legacy stores do not need a process probe or native migration diagnostics.
     if !native_projects_owned {
         return codex_project_compat::ProjectCompatReport::default();
@@ -31100,6 +31191,12 @@ fn configure_codex_current_dir(
     let config_path = codex_config_path();
     let existing = read_text_if_exists(&config_path)?;
     codex_relay_restore::capture(&existing, api_key, force_api_mode)?;
+    // Revocation may use an old owned declaration, but this auxiliary read
+    // must not introduce a new failure for unrelated or corrupt old catalogs.
+    // Managed-policy catalogs still retain mark_login_catalog's strict checks.
+    let previous_model_catalog = if model_catalog_plan.is_some() {
+        read_json_if_exists(&target.dir.join(CODEX_MODEL_CATALOG_FILE)).ok().flatten()
+    } else { None };
     let model_catalog = match (model_catalog_plan, resolved_model_catalog) {
         (Some(plan), Some(catalog)) => {
             let marked = desktop_model_support::mark_login_catalog(target, &existing, catalog)?;
@@ -31125,6 +31222,13 @@ fn configure_codex_current_dir(
             Some(&reasoning_effort),
         ),
     );
+    let merged_config = match resolved_model_catalog {
+        Some(catalog) => {
+            let safe = desktop_model_support::reconcile_selected_capabilities(&merged_config, catalog)?;
+            desktop_model_support::reconcile_previous_selection(&safe, &existing, catalog, previous_model_catalog.as_ref())?
+        },
+        None => merged_config,
+    };
     // Older Gaoge builds temporarily forced Code Mode on. Restore the user's
     // original value before writing the Native Responses catalog; these model
     // entries are ordinary API-visible models and must not depend on Code Mode.
@@ -31692,10 +31796,11 @@ fn repair_codex_managed_ultra_target(
         let Some(slug) = entry.get("slug").and_then(Value::as_str).map(str::to_string) else {
             continue;
         };
-        // Restrict repair to reasoning metadata; never rebuild unrelated model
-        // instructions, tools, speed settings, or unknown future capabilities.
+        // Repair reasoning and explicitly managed speed capabilities only; never
+        // rebuild unrelated model instructions, tools, or unknown capabilities.
         let model = canonical_codex_catalog_entry_model_name(entry, &slug, &aggregate.routes);
-        if codex_model_supports_ultra_reasoning(&model)
+        if entry.get("gaogeModelCapabilities").is_some()
+            || codex_model_supports_ultra_reasoning(&model)
             || codex_model_caps_reasoning_at_max(&model)
             || codex_model_caps_reasoning_at_xhigh(&model)
         {
@@ -31703,13 +31808,13 @@ fn repair_codex_managed_ultra_target(
                 object.entry("supported_reasoning_levels".to_string())
                     .or_insert_with(|| codex_native_responses_model_entry(&model, 0)["supported_reasoning_levels"].clone());
                 reconcile_codex_reasoning_levels(object, &model);
-                if codex_model_supports_ultra_reasoning(&model) {
-                    reconcile_codex_multi_agent_version(object, &model);
-                }
+                reconcile_codex_multi_agent_version(object, &model);
+                reconcile_codex_speed_tiers(object, &model);
             }
         }
     }
     let repaired = ensure_codex_ultra_reasoning_controls(&existing);
+    let repaired = desktop_model_support::reconcile_selected_capabilities(&repaired, &catalog)?;
     validate_codex_config_toml(&repaired)?;
     let desktop = repaired.parse::<toml_edit::Document>().map_err(|error| error.to_string())?;
     if desktop.get("desktop").and_then(|table| table.get(CODEX_DESKTOP_SHOW_ULTRA_KEY))
@@ -32721,6 +32826,8 @@ fn gaoge_configure_codex_inner(app: AppHandle, request: Value) -> Result<Value, 
     let model_catalog_plan = resolved.plan;
     let mut model_catalog = resolved.catalog;
     if let Some(policy) = desktop_model_policy.as_ref().filter(|policy| policy.policy.enabled) {
+        desktop_model_support::preserve_nonreasoning_declarations(&mut model_catalog, &targets);
+        desktop_model_support::apply_catalog_capabilities(&mut model_catalog, &policy.policy);
         model_catalog["gaogeDesktopModelSupport"] = json!({"version":1,"revision":policy.policy.revision});
     }
     let locked_model_mode = model_catalog_plan.mode == CODEX_MODEL_SELECTION_LOCKED;

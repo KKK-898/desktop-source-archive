@@ -21,10 +21,70 @@ fn scope(home: &Path) -> Result<String, String> {
     Ok(format!("{:x}", Sha256::digest(text.as_bytes())))
 }
 
-fn decorate(mut value: Value, home: &Path) -> Result<Value, String> {
-    value["scope"] = json!(scope(home)?);
-    value["runtimeRevision"] = json!(current_codex_runtime_revision());
-    Ok(value)
+fn decorate(mut value: Value, scope: &str, revision: u64) -> Value {
+    value["scope"] = json!(scope);
+    value["runtimeRevision"] = json!(revision);
+    value
+}
+
+fn legacy_api_project_state(state: &Value) -> bool {
+    !codex_project_compat::has_content_owner_state(state)
+        && state.get("electron-account-renderer-state-v1")
+            .and_then(Value::as_object)
+            .is_some_and(|envelope| envelope.get("owner") == Some(&Value::Null)
+                && envelope.get("inactive").is_some_and(Value::is_object))
+}
+
+// A cached snapshot, caller's earlier JSON, or absent SQLite file is not proof
+// that this request belongs to an audited legacy API session. Pin the actual
+// auth and native bytes to one home/generation until publication or CAS.
+struct LegacyApiProjectScope<'a> {
+    home: &'a Path,
+    scope: String,
+    revision: u64,
+    auth_digest: [u8; 32],
+    native_bytes: Vec<u8>,
+    native: Value,
+}
+
+impl<'a> LegacyApiProjectScope<'a> {
+    fn load(home: &'a Path) -> Option<Self> {
+        if codex_project_compat::has_native_global_state_db(home) { return None; }
+        let revision = current_codex_runtime_revision();
+        let scope = scope(home).ok()?;
+        let auth = codex_api_local_projects::read_bounded_bytes(&home.join("auth.json")).ok()??;
+        if !codex_api_mode::enabled(Some(&serde_json::from_slice(&auth).ok()?)) { return None; }
+        let native_bytes = codex_api_local_projects::read_bounded_bytes(&home.join(".codex-global-state.json")).ok()??;
+        let native = serde_json::from_slice(&native_bytes).ok()?;
+        if !legacy_api_project_state(&native) || codex_project_compat::has_native_global_state_db(home) { return None; }
+        Some(Self { home, scope, revision, auth_digest: Sha256::digest(auth).into(), native_bytes, native })
+    }
+
+    fn verify(&self) -> Result<(), String> {
+        let active = || current_codex_runtime_revision() == self.revision
+            && active_home().as_deref() == Ok(self.home)
+            && !codex_project_compat::has_native_global_state_db(self.home);
+        let read = |name: &str| codex_api_local_projects::read_bounded_bytes(&self.home.join(name)).ok().flatten();
+        if !active() || scope(self.home).as_deref() != Ok(self.scope.as_str())
+            || !read("auth.json").is_some_and(|bytes| <[u8; 32]>::from(Sha256::digest(bytes)) == self.auth_digest)
+            || read(".codex-global-state.json").as_deref() != Some(self.native_bytes.as_slice())
+            || !active()
+        {
+            return Err("当前原生项目范围未验证，未修改本地项目缓存。".into());
+        }
+        Ok(())
+    }
+
+    fn prepare(&self) -> Result<Option<Value>, String> {
+        let selected = verified_native_project_source(self.home, &self.native)?;
+        let source = selected.as_ref().unwrap_or(&self.native);
+        let databases = with_codex_dir(self.home, codex_state_sqlite_paths);
+        codex_api_local_projects::prepare_if_current(self.home, source, &databases, &|| self.verify())
+    }
+
+    fn decorate(&self, value: Value) -> Value {
+        decorate(value, &self.scope, self.revision)
+    }
 }
 
 // Native main54827 derives renderer owners from the ordered user/account pair.
@@ -105,7 +165,9 @@ pub(super) fn verified_native_project_source(
     home: &Path,
     state: &Value,
 ) -> Result<Option<Value>, String> {
-    if state
+    if codex_project_compat::has_native_global_state_db(home)
+        || codex_project_compat::has_content_owner_state(state)
+        || state
         .get("local-projects")
         .is_some_and(|catalog| !catalog.is_null())
     {
@@ -160,43 +222,70 @@ pub(super) fn verified_native_project_source(
 /// transition may merge an official baseline; API restarts keep their edits.
 pub(super) fn prepare_for_login(was_official: bool) -> Result<(), String> {
     let home = active_home()?;
+    if !was_official {
+        if let Some(grant) = LegacyApiProjectScope::load(&home) {
+            grant.prepare()?;
+        }
+        return Ok(());
+    }
+    if codex_project_compat::has_native_global_state_db(&home) {
+        return Ok(());
+    }
     let Some(source) = read_json_if_exists(&home.join(".codex-global-state.json"))? else {
         return Ok(());
     };
+    if codex_project_compat::has_content_owner_state(&source) {
+        return Ok(());
+    }
     let selected = verified_native_project_source(&home, &source)?;
     let source = selected.as_ref().unwrap_or(&source);
     let databases = with_codex_dir(&home, codex_state_sqlite_paths);
-    if was_official {
-        codex_api_local_projects::capture_with_databases(&home, source, &databases)?;
-    } else {
-        codex_api_local_projects::prepare_with_databases(&home, source, &databases)?;
-    }
+    codex_api_local_projects::capture_with_databases(&home, source, &databases)?;
     Ok(())
+}
+
+// A read-only grant for the reviewed native shared-store path. This never
+// reads or exports the legacy cache, nor treats a SQLite filename as proof of
+// project ownership. The renderer must independently verify its exact native
+// contract, hydration, signed-out API owner and project RPC readback.
+fn native_shared_grant(home: &Path) -> Result<Option<Value>, String> {
+    let revision = current_codex_runtime_revision();
+    let Some(auth_bytes) = codex_api_local_projects::read_bounded_bytes(&home.join("auth.json"))? else { return Ok(None); };
+    let auth: Value = match serde_json::from_slice(&auth_bytes) { Ok(value) => value, Err(_) => return Ok(None) };
+    if !codex_api_mode::enabled(Some(&auth)) { return Ok(None); }
+    let native_shared = codex_project_compat::has_native_global_state_db(home)
+        || codex_api_local_projects::read_bounded_bytes(&home.join(".codex-global-state.json"))?
+            .and_then(|bytes| serde_json::from_slice::<Value>(&bytes).ok())
+            .is_some_and(|state| state["electron-renderer-content-owner"] == "signed-out");
+    if !native_shared { return Ok(None); }
+    let home_scope = scope(home)?;
+    if active_home()?.as_path() != home || current_codex_runtime_revision() != revision
+        || codex_api_local_projects::read_bounded_bytes(&home.join("auth.json"))?.as_deref() != Some(auth_bytes.as_slice()) {
+        return Ok(None);
+    }
+    Ok(Some(decorate(json!({"version":1,"storage":"native-shared"}), &home_scope, revision)))
 }
 
 /// Called before launch as well as by the status poll. Preparation only seeds
 /// a missing dedicated snapshot; it never replaces API edits with disk globals.
 pub(super) fn runtime_payload(native_state: Option<&Value>) -> Result<Value, String> {
     let home = active_home()?;
-    let disk_state = if native_state.is_none() {
-        read_json_if_exists(&home.join(".codex-global-state.json"))?
-    } else {
-        None
-    };
-    let snapshot = if let Some(source) = native_state.or(disk_state.as_ref()) {
-        let selected = verified_native_project_source(&home, source)?;
-        let source = selected.as_ref().unwrap_or(source);
-        let databases = with_codex_dir(&home, codex_state_sqlite_paths);
-        codex_api_local_projects::prepare_with_databases(&home, source, &databases)?
-    } else {
-        codex_api_local_projects::read(&home)?
-    };
-    let snapshot = snapshot.unwrap_or_else(|| json!({
+    if let Some(grant) = native_shared_grant(&home)? { return Ok(grant); }
+    let unavailable = || Ok(decorate(json!({
+        "version": 1, "unavailable": true, "reason": "unverified-native-project-scope"
+    }), &scope(&home)?, current_codex_runtime_revision()));
+    if native_state.is_some_and(|state| !legacy_api_project_state(state)) { return unavailable(); }
+    let Some(grant) = LegacyApiProjectScope::load(&home) else { return unavailable(); };
+    let snapshot = grant.prepare();
+    if grant.verify().is_err() {
+        return unavailable();
+    }
+    let snapshot = snapshot?.unwrap_or_else(|| json!({
         "version": 1, "revision": 0,
         "globals": {"local-projects": {}, "electron-saved-workspace-roots": [], "electron-workspace-root-labels": {}},
         "memberships": {"assignments": {}, "projectlessThreadIds": []}
     }));
-    decorate(snapshot, &home)
+    Ok(grant.decorate(snapshot))
 }
 
 /// Prefer native quit so its pending global-state writes can flush before the
@@ -275,10 +364,9 @@ pub(super) fn commit(payload: &Value) -> Result<Value, String> {
         "正在切换登录配置，本地项目稍后保存。",
     )?;
     let home = active_home()?;
-    if !codex_api_coding_mode_enabled()
-        || payload.get("runtimeRevision").and_then(Value::as_u64)
-            != Some(current_codex_runtime_revision())
-        || payload.get("scope").and_then(Value::as_str) != Some(scope(&home)?.as_str())
+    let grant = LegacyApiProjectScope::load(&home).ok_or("当前原生项目范围未验证，未修改本地项目缓存。")?;
+    if payload.get("runtimeRevision").and_then(Value::as_u64) != Some(grant.revision)
+        || payload.get("scope").and_then(Value::as_str) != Some(grant.scope.as_str())
     {
         return Err("本地项目保存来源已失效，未修改缓存。".to_string());
     }
@@ -292,8 +380,10 @@ pub(super) fn commit(payload: &Value) -> Result<Value, String> {
     let memberships = payload
         .get("memberships")
         .ok_or_else(|| "本地项目成员状态缺失。".to_string())?;
-    let saved = codex_api_local_projects::commit(&home, expected, globals, memberships)?;
-    Ok(json!({"ok": true, "apiLocalProjects": decorate(saved, &home)?}))
+    let saved = codex_api_local_projects::commit_if_current(&home, &grant.native,
+        expected, globals, memberships, &|| grant.verify())?;
+    grant.verify()?;
+    Ok(json!({"ok": true, "apiLocalProjects": grant.decorate(saved)}))
 }
 
 #[cfg(test)]

@@ -4,9 +4,18 @@ const crypto = require('node:crypto')
 const { spawnSync } = require('node:child_process')
 const { installedAsar } = require('./verify-codex-ultra-installed.cjs')
 
-function assertApiModePassed(result, format = 'esm') {
-  if (result.error || result.status !== 0) throw new Error(`Installed API mode verification failed: ${result.error?.message || result.status}`)
+function assertApiModePassed(result, format = 'esm', projectContract = 'renderer-owner') {
   const output = result.stdout || ''
+  if (result.error || result.status !== 0) {
+    const names = [...output.matchAll(/^not ok \d+ - ([^\r\n]+)/gm)].map(match => match[1].trim())
+    const files = names.filter(name => /(?:^|[\\/])[^\\/]+\.test\.cjs$/.test(name))
+    const named = names.filter(name => !files.includes(name))
+    const details = []
+    if (files.length) details.push(`${files.length} file-level failure(s): ${files.map(name => name.split(/[\\/]/).pop()).join(', ')}`)
+    if (named.length) details.push(`${named.length} named test failure(s): ${named.slice(0, 3).join('; ')}${named.length > 3 ? `; and ${named.length - 3} more` : ''}`)
+    const reason = result.error?.message || result.signal || `exit ${result.status}`
+    throw new Error(`Installed API mode verification failed (${reason}). ${[...details, 'See the native test output above; this check does not call the relay.'].join('. ')}`)
+  }
   const required = format === 'webpack' ? ['installed webpack native settings use API Coding policy without granting account access', 'installed webpack renderer bindings use native state and setter without initializing modules', 'installed webpack native Coding selects Codex sidebar without rewriting home composer preference',
     'real native RPC proxies restore API completion and Coding without assigning methods',
     'native scoped API hydration preserves only its reviewed shared completion whitelist',
@@ -15,6 +24,8 @@ function assertApiModePassed(result, format = 'esm') {
     'installed webpack API mode captures native selector and portal events until account switch or disposal',
     'native direct welcome redirects home when shared completion is restored despite pending=true',
     'native first API onboarding is preserved and genuine completion still persists without a principal',
+    'installed native onboarding restores a verified API completion receipt after an empty host hydration',
+    'installed native onboarding keeps a fresh API identity on welcome without a receipt',
     'installed native project chain and final sidebar preserve projects and complete legacy memberships in pure API mode',
     'installed native project sidebar survives repeated API official API transitions without changing membership or account permissions',
     'installed native first-pass migration matches all Rust-restored local memberships beyond the pending queue',
@@ -27,6 +38,8 @@ function assertApiModePassed(result, format = 'esm') {
     'native explicit assignment and projectless conflicts stay unverified and are not overwritten',
     'newer GET revisions cannot silently authorize overwriting a concurrent snapshot',
     'native owner change blocks hydration before any catalog write',
+    'installed native project guard checks the active owner before accessing project data',
+    'installed API project guard rejects legacy snapshots on the native shared store',
     'real native account switch closes old RPC before selecting another owner',
     'same API renderer stops on a different home',
     'full native message-port RPC restores catalog and membership without replacing service methods',
@@ -50,7 +63,23 @@ function assertApiModePassed(result, format = 'esm') {
     "a fresh guard honors matched native checkpoint deletions and membership changes",
     "a mismatched native checkpoint waits for a fresh snapshot before treating live deletions as authoritative",
     "foreign or malformed native checkpoints never authorize initial snapshot replay"] : ['installed native API Work fails before normalization', 'installed renderer bindings use native state'];
-  for (const name of required) {
+  // The startup-clear/restore checkpoint is a legacy native contract, not a
+  // product requirement for modern hosts that retain the shared catalog.
+  // Keep its 26 assertions in the legacy suite; require positive modern native
+  // behavior checks for the current installed host instead of marking skips.
+  const legacy = new Set([...fs.readFileSync(path.join(__dirname, 'codex-api-project-state.test.cjs'), 'utf8')
+    .matchAll(/^run\('([^']+)'/gm)].map(match => match[1]));
+  const modern = [...fs.readFileSync(path.join(__dirname, 'codex-api-project-shared-state.test.cjs'), 'utf8')
+    .matchAll(/^run\('([^']+)'/gm)].map(match => match[1]);
+  if (format === 'webpack' && !['renderer-owner', 'content-owner'].includes(projectContract)) {
+    throw new Error('Unreviewed native project contract: ' + projectContract);
+  }
+  if (format === 'webpack' && projectContract === 'content-owner' && (legacy.size !== 26 || modern.length < 13)) {
+    throw new Error('Native project contract coverage is incomplete');
+  }
+  const contractRequired = format === 'webpack' && projectContract === 'content-owner'
+    ? [...required.filter(name => !legacy.has(name)), ...modern] : required;
+  for (const name of contractRequired) {
     if (!output.split(/\r?\n/).some(line => /^ok \d+ - /.test(line)
         && line.replace(/^ok \d+ - /, '').trim() === name && !/#\s*(?:SKIP|TODO)\b/i.test(line))) {
       throw new Error(`Required native API mode check did not run: ${name}`)
@@ -66,7 +95,14 @@ function verifyInstalledApiMode({ env = process.env, run = spawnSync, files = fs
   const digest = () => crypto.createHash('sha256').update(files.readFileSync(packagePath)).digest('hex')
   const before = digest()
   const format = require('@electron/asar').listPackage(packagePath).some(name => /app-initial-[^\\/]+\.js$/.test(name)) ? 'esm' : 'webpack'
-  const tests = format === 'webpack' ? ['scripts/codex-api-mode-webpack.test.cjs', 'scripts/codex-api-onboarding.test.cjs', 'scripts/codex-projects-native.test.cjs', 'scripts/codex-project-migration-native.test.cjs', 'scripts/codex-api-project-state.test.cjs'] : ['scripts/codex-api-mode-runtime.test.cjs', 'scripts/codex-api-mode-bindings.test.cjs']
+  const packageVersion = JSON.parse(require('@electron/asar').extractFile(packagePath, 'package.json')).version
+  const projectContract = packageVersion === '26.1111.21308' ? 'content-owner' : 'renderer-owner'
+  const tests = format === 'webpack' ? [
+    'scripts/codex-api-mode-webpack.test.cjs', 'scripts/codex-api-onboarding.test.cjs',
+    'scripts/codex-api-onboarding-host-receipt.test.cjs', 'scripts/codex-projects-native.test.cjs',
+    'scripts/codex-project-migration-native.test.cjs', 'scripts/codex-api-project-state.test.cjs',
+    'scripts/codex-api-project-owner-key.test.cjs', 'scripts/codex-api-project-scope.test.cjs',
+  ] : ['scripts/codex-api-mode-runtime.test.cjs', 'scripts/codex-api-mode-bindings.test.cjs']
   log(`Verifying API coding mode against installed Codex: ${packagePath}`)
   const result = run(process.execPath, ['--test', '--test-reporter=tap',
     ...tests], {
@@ -75,10 +111,10 @@ function verifyInstalledApiMode({ env = process.env, run = spawnSync, files = fs
   })
   if (result.stdout) log(result.stdout.trimEnd())
   if (result.stderr) log(result.stderr.trimEnd())
-  assertApiModePassed(result, format)
+  assertApiModePassed(result, format, projectContract)
   if (digest() !== before) throw new Error('Codex updated during API mode verification; rerun against the current installation.')
-  const evidence = { installedApiModeVerified: true, format, packagePath, sha256: before,
-    coverage: { nativeModeContract: true, nativeSharedOnboarding: format === 'webpack', nativeProjectSidebar: format === 'webpack', nativeProjectMigration: format === 'webpack', nativeProjectMainState: format === 'webpack', nativeProjectExitCheckpoint: format === 'webpack', nativeGracefulExit: format === 'webpack', nativeInitialProjectMerge: format === 'webpack', liveUiRoundTrip: false } }
+  const evidence = { installedApiModeVerified: true, format, packagePath, packageVersion, projectContract, sha256: before,
+    coverage: { nativeModeContract: true, nativeSharedOnboarding: format === 'webpack', nativeProjectSidebar: format === 'webpack', nativeProjectMigration: format === 'webpack', nativeProjectMainState: format === 'webpack', nativeProjectScopeGuard: format === 'webpack', nativeProjectExitCheckpoint: format === 'webpack' && projectContract === 'renderer-owner', nativeGracefulExit: format === 'webpack', nativeInitialProjectMerge: format === 'webpack' && projectContract === 'renderer-owner', nativeSharedProjectPersistence: format === 'webpack' && projectContract === 'content-owner', legacyRestoreAssertionsExecuted: format === 'webpack' && projectContract === 'renderer-owner', liveUiRoundTrip: false } }
   log(JSON.stringify(evidence))
   return evidence
 }

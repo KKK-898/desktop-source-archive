@@ -63,7 +63,10 @@ function nativeConfigQueryFixture(runtime, initialSource, callbackSource, modelF
   assert.ok(reviewedBridge && ts.isStringLiteral(reviewedBridge), 'Missing reviewed configuration bridge source')
   // This application bridge contains live config/read functions. Compare its
   // source only: never initialize it to obtain the helper re-exports.
-  assert.equal(runtime.codexUltraCanonical(configBridgeSource), runtime.codexUltraCanonical(reviewedBridge.text),
+  // 26.1111 renames only the serialized-config parser dependency Fkn8 to
+  // ZG9f. Both complete bridges are source-only provenance: neither executes.
+  const reviewedBridges = [reviewedBridge.text, reviewedBridge.text.replace('\"Fkn8\"', '\"ZG9f\"')]
+  assert.ok(reviewedBridges.some(source => runtime.codexUltraCanonical(configBridgeSource) === runtime.codexUltraCanonical(source)),
     'Unsupported native configuration helper bridge')
   const filterSource = webpackPureExport(modelFilterSource, 'a', 'i')
   assert.equal(runtime.codexUltraCanonical(filterSource), runtime.codexUltraCanonical(functionDeclaration(reviewedTree, 'i')),
@@ -120,9 +123,9 @@ function nativeConfigQueryFixture(runtime, initialSource, callbackSource, modelF
 function nativeUltraQueryFixture(initialSource, { modelFilterSource, configHelperSource, configBridgeSource } = {}) {
   const runtime = vm.createContext({})
   vm.runInContext(fs.readFileSync(path.join(__dirname, '../src-tauri/src/codex_ultra_runtime.js'), 'utf8'), runtime)
-  const callbackSource = runtime.inspectCodexUltraRuntimeSource(initialSource).callback
-  if (runtime.CODEX_ULTRA_RUNTIME_CONFIG_QUERY_SHAPE
-      && runtime.codexUltraCanonical(callbackSource) === runtime.codexUltraCanonical(runtime.CODEX_ULTRA_RUNTIME_CONFIG_QUERY_SHAPE)) {
+  const contract = runtime.inspectCodexUltraRuntimeSource(initialSource)
+  const callbackSource = contract.callback
+  if (contract.configInQuery) {
     return nativeConfigQueryFixture(runtime, initialSource, callbackSource, modelFilterSource, configHelperSource, configBridgeSource)
   }
   if (runtime.codexUltraCanonical(callbackSource) === runtime.codexUltraCanonical(runtime.CODEX_ULTRA_RUNTIME_WEBPACK_QUERY_SHAPE)) {

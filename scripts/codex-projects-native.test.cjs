@@ -5,7 +5,7 @@ const vm = require('node:vm')
 const crypto = require('node:crypto')
 const test = require('node:test')
 const { installedAsar } = require('./verify-codex-ultra-installed.cjs')
-const { nativeProjectsFixture } = require('./codex-projects-native-fixture.cjs')
+const { nativeProjectsFixture, selectProjectFactoryCopy } = require('./codex-projects-native-fixture.cjs')
 
 const beforePath = path.join(__dirname, 'fixtures/codex-project-migration-26.1103-dual-store.json')
 const beforeBytes = fs.readFileSync(beforePath)
@@ -69,7 +69,7 @@ async function assertRepairedSidebar(h) {
   assert.equal(groups.projectGroups.length, 4)
   assert.deepEqual(inGroups(groups.projectGroups), repairedIds)
   const sidebar = await h.readSidebar()
-  assert.equal(sidebar.layout.projectKeys.length, 4)
+  assert.deepEqual([...sidebar.layout.projectKeys].sort(), Object.keys(afterCatalog).map(id => 'codex:project:' + id).sort())
   assert.deepEqual(inGroups(sidebar.codexProjectGroups), repairedIds)
   const assignedKeys = new Set(repairedIds.map(id => 'codex:thread:local:' + id))
   assert.ok(sidebar.layout.chatKeys.every(key => !assignedKeys.has(key)), 'Assigned threads must not fall back into the ungrouped chats section')
@@ -79,10 +79,25 @@ async function assertRepairedSidebar(h) {
   return sidebar
 }
 
+test('native project factory selection rejects unreviewed conflicts and never depends on scan order', () => {
+  const desktop = { file: 'assets\\desktop.js', source: 'desktop' }
+  const other = { file: 'assets\\other.js', source: 'much longer alternate' }
+  const digest = source => crypto.createHash('sha256').update(source).digest('hex')
+  const review = [['assets/desktop.js', digest(desktop.source)], ['assets/other.js', digest(other.source)]]
+  for (const copies of [[desktop, other], [other, desktop]]) assert.equal(selectProjectFactoryCopy('fixture', copies, review), desktop)
+  assert.equal(selectProjectFactoryCopy('singleton', [desktop]), desktop)
+  assert.throws(() => selectProjectFactoryCopy('singleton', [desktop, other]), /exactly one/)
+  assert.throws(() => selectProjectFactoryCopy('fixture', [other], review), /Unreviewed set/)
+  assert.throws(() => selectProjectFactoryCopy('fixture', [desktop, other, {...other, file: 'third.js'}], review), /Unreviewed set/)
+  assert.throws(() => selectProjectFactoryCopy('fixture', [desktop, other, desktop], review), /Duplicate native project factory/)
+  assert.throws(() => selectProjectFactoryCopy('fixture', [{...desktop, source: 'changed'}, other], review), /Unreviewed native project copy/)
+  assert.throws(() => selectProjectFactoryCopy('fixture', [desktop, {...other, source: 'changed'}], review), /Unreviewed native project copy/)
+})
+
 test('native project projection is tied to the observed fixture and real Rust transaction', () => {
   assert.equal(after.syntheticOnly, true)
   assert.equal(after.evidence.nativeCodexAppVersion,before.evidence.nativeCodexAppVersion)
-  if(native) assert.ok([before.evidence.nativeCodexAppVersion,'26.1103.60933'].includes(native.packageVersion),'Unreviewed native selector package '+native.packageVersion)
+  if (native) assert.ok([before.evidence.nativeCodexAppVersion, '26.1103.60933', '26.1111.21308'].includes(native.packageVersion), 'Unreviewed native selector package ' + native.packageVersion)
   if (after.provenance) assert.equal(after.provenance.sourceFixtureSha256, crypto.createHash('sha256').update(beforeBytes).digest('hex'))
   assert.equal(after.projects.length, 4)
   assert.equal(repairedIds.length, after.expected.restored)

@@ -266,6 +266,106 @@ class PublicSourceExportTests(unittest.TestCase):
             self.assertEqual(report["rightsDisclosures"][0]["status"], "unverified-third-party-artwork")
             self.assertEqual(report["rightsDisclosures"][0]["path"], target)
 
+    def current_owner_decision_fixture(self):
+        paths, target, _ = self.owner_decision_fixture()
+        for name in ["package.json", "package-lock.json", "src-tauri/Cargo.toml", "src-tauri/tauri.conf.json"]:
+            paths[name] = paths[name].replace(b"1.7.1", b"1.7.2")
+        audit = json.loads(paths["scripts/public-source-audit.json"])
+        item = audit["items"][0]
+        original = {k: v for k, v in item.items() if k != "releaseDecision"}
+        scope = {"decisionId": mod.OWNER_RELEASE_172_DECISION_ID, "version": "1.7.2", "items": [original]}
+        evidence = b"Synthetic release direction; not an owner rights acknowledgement.\n```json\n" + mod.json_bytes(scope) + b"```\n"
+        evidence_hash = mod.sha(evidence)
+        paths[mod.OWNER_RELEASE_172_EVIDENCE_PATH] = evidence
+        item["releaseDecision"] = {"type": "owner-directed-publication", "decisionId": mod.OWNER_RELEASE_172_DECISION_ID,
+            "version": "1.7.2", "sha256": item["sha256"],
+            "evidence": [{"path": mod.OWNER_RELEASE_172_EVIDENCE_PATH, "sha256": evidence_hash}],
+            "retainsUnverifiedDisclosures": True}
+        paths["scripts/public-source-audit.json"] = mod.json_bytes(audit)
+        return paths, target, evidence_hash
+
+    def inspect_current_owner_fixture(self, paths, evidence_hash):
+        with mock.patch.object(mod, "OWNER_RELEASE_172_SCOPE_COUNT", 1), mock.patch.object(mod, "OWNER_RELEASE_172_EVIDENCE_SHA256", evidence_hash):
+            return mod.inspect(paths, [])
+
+    def test_current_direction_preserves_disclosures_without_inventing_owner_acknowledgement(self):
+        paths, target, evidence_hash = self.current_owner_decision_fixture()
+        version, checks, findings, disclosures = self.inspect_current_owner_fixture(paths, evidence_hash)
+        self.assertEqual(version, "1.7.2")
+        self.assertTrue(all(x["ok"] for x in checks))
+        self.assertEqual(findings, [])
+        self.assertEqual(disclosures[0]["status"], "unverified-third-party-artwork")
+        self.assertEqual(disclosures[0]["path"], target)
+        self.assertTrue(disclosures[0]["releaseDecision"]["retainsUnverifiedDisclosures"])
+        self.assertNotIn("acknowledgesUnverifiedRights", disclosures[0]["releaseDecision"])
+
+    def test_current_direction_rejects_changed_assets_future_versions_or_forged_acknowledgement(self):
+        cases = ["changed-asset", "changed-hash", "missing-evidence", "changed-evidence", "missing-disclosure-flag",
+                 "false-disclosure-flag", "invented-acknowledgement", "missing-asset", "missing-audit", "new-asset",
+                 "changed-reason", "cleared-status", "old-decision", "future-version", "future-decision"]
+        for case in cases:
+            with self.subTest(case=case):
+                paths, target, evidence_hash = self.current_owner_decision_fixture()
+                audit = json.loads(paths["scripts/public-source-audit.json"])
+                item = audit["items"][0]
+                if case == "changed-asset": paths[target] += b"changed"
+                elif case == "changed-hash":
+                    paths[target] += b"changed"
+                    item["sha256"] = mod.sha(paths[target])
+                    item["releaseDecision"]["sha256"] = item["sha256"]
+                elif case == "missing-evidence": del paths[mod.OWNER_RELEASE_172_EVIDENCE_PATH]
+                elif case == "changed-evidence": paths[mod.OWNER_RELEASE_172_EVIDENCE_PATH] += b"changed"
+                elif case == "missing-disclosure-flag": del item["releaseDecision"]["retainsUnverifiedDisclosures"]
+                elif case == "false-disclosure-flag": item["releaseDecision"]["retainsUnverifiedDisclosures"] = False
+                elif case == "invented-acknowledgement": item["releaseDecision"]["acknowledgesUnverifiedRights"] = True
+                elif case == "missing-asset": del paths[target]
+                elif case == "missing-audit": audit["items"] = []
+                elif case == "new-asset": paths["theme-resources/sources/new.png"] = b"outside release scope"
+                elif case == "changed-reason": item["reason"] = "invented new permission"
+                elif case == "cleared-status": item["status"] = "cleared"
+                elif case == "old-decision": item["releaseDecision"]["version"] = "1.7.1"
+                elif case == "future-decision": item["releaseDecision"]["version"] = "1.7.3"
+                elif case == "future-version":
+                    for name in ["package.json", "package-lock.json", "src-tauri/Cargo.toml", "src-tauri/tauri.conf.json"]:
+                        paths[name] = paths[name].replace(b"1.7.2", b"1.7.3")
+                paths["scripts/public-source-audit.json"] = mod.json_bytes(audit)
+                _, checks, findings, _ = self.inspect_current_owner_fixture(paths, evidence_hash)
+                self.assertTrue(any(not x["ok"] for x in checks), case)
+                if case not in {"missing-asset", "missing-audit"}: self.assertTrue(findings, case)
+
+    def test_current_direction_export_remains_release_ready_with_unresolved_disclosures(self):
+        paths, target, evidence_hash = self.current_owner_decision_fixture()
+        for source in mod.REPLACEMENTS.values(): paths[source] = b"Synthetic public build documentation"
+        with tempfile.TemporaryDirectory() as temp:
+            with mock.patch.object(mod, "OWNER_RELEASE_172_SCOPE_COUNT", 1), mock.patch.object(mod, "OWNER_RELEASE_172_EVIDENCE_SHA256", evidence_hash):
+                with mock.patch.object(mod, "read_source", return_value=(paths, [], [], {}, "a" * 40, "b" * 40)):
+                    result = mod.export(temp, Path(temp) / "out")
+            report = json.loads(Path(result["ReportPath"]).read_bytes())
+            self.assertTrue(result["ReleaseReady"])
+            self.assertEqual(report["version"], "1.7.2")
+            self.assertEqual(report["rightsFindings"], [])
+            self.assertEqual(report["rightsDisclosures"][0]["path"], target)
+            self.assertNotIn("acknowledgesUnverifiedRights", report["rightsDisclosures"][0]["releaseDecision"])
+
+    def test_real_current_direction_is_pinned_and_preserves_exact_previous_unresolved_scope(self):
+        root = Path(__file__).resolve().parent.parent
+        old_doc = (root / mod.OWNER_RELEASE_EVIDENCE_PATH).read_bytes()
+        new_doc = (root / mod.OWNER_RELEASE_172_EVIDENCE_PATH).read_bytes()
+        self.assertEqual(mod.sha(new_doc), mod.OWNER_RELEASE_172_EVIDENCE_SHA256)
+        old_scope, old_issues = mod.owner_release_scope({mod.OWNER_RELEASE_EVIDENCE_PATH: old_doc})
+        scope, issues = mod.owner_release_scope({mod.OWNER_RELEASE_172_EVIDENCE_PATH: new_doc}, "1.7.2")
+        self.assertEqual(old_issues + issues, [])
+        self.assertEqual(scope, old_scope)
+        audit = json.loads((root / "scripts/public-source-audit.json").read_bytes())
+        self.assertEqual(set(scope), {item["path"] for item in audit["items"]})
+        for item in audit["items"]:
+            self.assertEqual({k: v for k, v in item.items() if k != "releaseDecision"}, scope[item["path"]])
+            self.assertEqual(mod.sha((root / item["path"]).read_bytes()), item["sha256"])
+            self.assertEqual(item["releaseDecision"]["version"], "1.7.2")
+            self.assertNotIn("acknowledgesUnverifiedRights", item["releaseDecision"])
+        self.assertIsNone(mod.owner_release_record("1.7.3"))
+        self.assertIsNone(mod.owner_release_record("2.0.0"))
+
     def test_real_owner_document_preserves_all_original_audit_fields(self):
         root = Path(__file__).resolve().parent.parent
         doc = (root / mod.OWNER_RELEASE_EVIDENCE_PATH).read_bytes()

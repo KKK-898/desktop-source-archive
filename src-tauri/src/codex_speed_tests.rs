@@ -247,7 +247,10 @@ mod codex_speed_regressions {
                     let catalog = read_json_if_exists(&dir.join(CODEX_MODEL_CATALOG_FILE))
                         .unwrap()
                         .unwrap();
-                    assert_eq!(catalog["models"].as_array().unwrap().len(), 6);
+                    assert_eq!(
+                        catalog["models"].as_array().unwrap().len(),
+                        CODEX_FAST_MODELS.len(),
+                    );
                     for entry in catalog["models"].as_array().unwrap() {
                         assert_fast(entry);
                     }

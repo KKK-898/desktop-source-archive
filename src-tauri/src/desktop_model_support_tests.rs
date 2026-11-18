@@ -514,3 +514,265 @@ fn desktop_model_support_disabled_policy_leaves_external_catalog_path_and_locked
         b"external user-owned catalog"
     );
 }
+
+
+#[test]
+fn desktop_model_capabilities_contract_is_optional_strict_and_cached() {
+    let mut value = json!({"version":1,"enabled":true,"models":["future-model"],"revision":"cap-1"});
+    assert!(validate_policy(&value).unwrap().model_capabilities.is_empty());
+    for invalid in [Value::Null,json!(true),json!([])] {
+        value["modelCapabilities"] = invalid;
+        assert!(validate_policy(&value).is_err());
+    }
+    for key in ["supportsUltra", "supportsFast"] {
+        for invalid in [Value::Null,json!("true"),json!(1),json!([])] {
+            value["modelCapabilities"] = json!({"future-model":{key:invalid}});
+            assert!(validate_policy(&value).is_err(), "{key}: {value}");
+        }
+    }
+    value["modelCapabilities"] = json!({"not-in-list":{"supportsUltra":true}});
+    assert!(validate_policy(&value).is_err());
+    value["modelCapabilities"] = json!({"future-model":{"supportsUltra":false,"supportsFast":true}});
+    let policy = validate_policy(&value).unwrap();
+    let directory = tempfile::tempdir().unwrap();
+    let path = directory.path().join("policy.json");
+    resolve_with_cache("scope", &path, Ok(policy.clone())).unwrap();
+    let cached = resolve_with_cache("scope", &path, Err("offline".into())).unwrap();
+    assert_eq!(cached.policy, policy);
+    assert_eq!(cached.policy.model_capabilities["future-model"].supports_ultra, Some(false));
+    assert!(resolve_with_cache("other-scope", &path, Err("offline".into())).is_err());
+    value["version"] = json!(2);
+    assert!(validate_policy(&value).is_err());
+}
+
+#[test]
+fn desktop_model_capabilities_enable_future_models_and_restore_defaults() {
+    for model in ["gpt-6.2-astra", "gpt-6.2-sol", "future-exact-model"] {
+        let mut catalog = build_codex_native_responses_catalog(&[model.to_string()]).unwrap();
+        let original = catalog.clone();
+        let policy = validate_policy(&json!({"version":1,"enabled":true,"models":[model],"revision":"cap",
+            "modelCapabilities":{model:{"supportsUltra":true,"supportsFast":true}}})).unwrap();
+        apply_catalog_capabilities(&mut catalog, &policy);
+        assert_eq!(codex_catalog_reasoning_effort(&catalog, model, Some("ultra")), "ultra");
+        assert_eq!(catalog["models"][0]["multi_agent_version"], "v2");
+        assert!(codex_model_entry_declares_speed(&catalog["models"][0]));
+        let standard = format!("model = {}\nmodel_reasoning_effort = \"medium\"\nservice_tier = \"default\"\n", json!(model));
+        assert_eq!(reconcile_selected_capabilities(&standard, &catalog).unwrap(), standard);
+        let request_config = build_codex_direct_config_with_catalog("fixture", "https://relay.invalid/v1", model, None,
+            Some(&codex_catalog_reasoning_effort(&catalog, model, Some("ultra"))));
+        assert_eq!(configured_root_value(&request_config, "model_reasoning_effort").as_deref(), Some("ultra"));
+        let legacy = fixture_policy(true, &[model], "legacy");
+        apply_catalog_capabilities(&mut catalog, &legacy);
+        assert_eq!(catalog, original, "removing declarations restores original fields");
+    }
+}
+
+#[test]
+fn desktop_model_capabilities_false_overrides_old_defaults_and_preserves_other_tiers() {
+    let model = "gpt-6.1-sol";
+    let mut catalog = build_codex_native_responses_catalog(&[model.into()]).unwrap();
+    catalog["models"][0]["service_tiers"].as_array_mut().unwrap().push(json!({"id":"flex","name":"Flexible"}));
+    catalog["models"][0]["additionalSpeedTiers"] = json!(["fast"," fast ","flex"]);
+    catalog["models"][0]["serviceTiers"] = json!([{"id":"priority"},{"value":"PRIORITY"},{"id":"flex","value":" PRIORITY "},{"id":"flex"}]);
+    catalog["models"][0]["supportedReasoningEfforts"] = json!([{"reasoningEffort":"ultra"},{"reasoningEffort":"max"}]);
+    let policy = validate_policy(&json!({"version":1,"enabled":true,"models":[model],"revision":"revoked",
+        "modelCapabilities":{model:{"supportsUltra":false,"supportsFast":false}}})).unwrap();
+    apply_catalog_capabilities(&mut catalog, &policy);
+    let entry = catalog["models"][0].as_object_mut().unwrap();
+    reconcile_codex_reasoning_levels(entry, model);
+    reconcile_codex_speed_tiers(entry, model);
+    assert!(!entry["supported_reasoning_levels"].as_array().unwrap().iter().any(|level| level["effort"] == "ultra"));
+    assert_eq!(entry["supportedReasoningEfforts"], json!([{"reasoningEffort":"max"}]));
+    assert_eq!(entry["service_tiers"], json!([{"id":"flex","name":"Flexible"}]));
+    assert_eq!(entry["additionalSpeedTiers"], json!(["flex"]));
+    assert_eq!(entry["serviceTiers"], json!([{"id":"flex"}]));
+    let configured = format!("model = {}\nmodel_reasoning_effort = \"ultra\"\nservice_tier = \"priority\"\n# keep me\n", json!(model));
+    let safe = reconcile_selected_capabilities(&configured, &catalog).unwrap();
+    assert_eq!(configured_root_value(&safe, "model_reasoning_effort").as_deref(), Some("max"));
+    assert_eq!(configured_root_value(&safe, "service_tier").as_deref(), Some("default"));
+    assert!(safe.contains("# keep me"));
+    let directory = tempfile::tempdir().unwrap();
+    let path = directory.path().join("catalog.json");
+    fs::write(&path, serde_json::to_vec(&catalog).unwrap()).unwrap();
+    let config = format!("model_catalog_json = {}\n", json!(path.to_string_lossy()));
+    assert!(!codex_api_speed_model_supported(&config, model));
+    assert!(!codex_api_speed_model_ids(&config).contains(&model.to_string()));
+}
+
+#[test]
+fn desktop_model_capabilities_do_not_promote_nonreasoning_or_leak_aliases() {
+    let model = "vendor/next";
+    let policy = validate_policy(&json!({"version":1,"enabled":true,"models":[model],"revision":"cap",
+        "modelCapabilities":{model:{"supportsUltra":true,"supportsFast":true}}})).unwrap();
+    for efforts in [json!([]), json!(["none"]), json!([{"effort":"none"}]), json!([{"reasoningEffort":"none"}])] {
+        let mut catalog = build_codex_native_responses_catalog(&[model.into()]).unwrap();
+        catalog["models"][0]["supported_reasoning_levels"] = efforts.clone();
+        apply_catalog_capabilities(&mut catalog, &policy);
+        assert_eq!(catalog["models"][0]["supported_reasoning_levels"], efforts);
+        assert_ne!(catalog["models"][0]["multi_agent_version"], "v2");
+        assert_eq!(codex_catalog_reasoning_effort(&catalog, model, Some("ultra")), "none");
+    }
+    let mut catalog = build_codex_native_responses_catalog(&[model.into(), "other/next".into()]).unwrap();
+    apply_catalog_capabilities(&mut catalog, &policy);
+    let directory = tempfile::tempdir().unwrap();
+    let path = directory.path().join("catalog.json");
+    fs::write(&path, serde_json::to_vec(&catalog).unwrap()).unwrap();
+    let config = format!("model_catalog_json = {}\n", json!(path.to_string_lossy()));
+    assert!(codex_api_speed_model_supported(&config, model));
+    assert!(!codex_api_speed_model_supported(&config, "other/next"));
+    assert!(!codex_api_speed_model_supported(&config, "vendor/NEXT"));
+}
+
+#[test]
+fn desktop_model_capabilities_restart_applies_revokes_and_removes_owned_entries() {
+    let directory = tempfile::tempdir().unwrap();
+    let (target, router, path, _) = relay_fixture(directory.path(), None);
+    let model = "gpt-6.2-astra";
+    let mut policy = validate_policy(&json!({"version":1,"enabled":true,"models":[model],"revision":"on",
+        "modelCapabilities":{model:{"supportsUltra":true,"supportsFast":true}}})).unwrap();
+    apply_rewrites(&[prepare_rewrite(&target, &router, &policy).unwrap().unwrap()]).unwrap();
+    let mut config = fs::read_to_string(target.dir.join("config.toml")).unwrap().parse::<toml_edit::Document>().unwrap();
+    config["model_reasoning_effort"] = toml_edit::value("ultra");
+    config["service_tier"] = toml_edit::value("priority");
+    fs::write(target.dir.join("config.toml"), config.to_string()).unwrap();
+    policy.model_capabilities.get_mut(model).unwrap().supports_ultra = Some(false);
+    policy.model_capabilities.get_mut(model).unwrap().supports_fast = Some(false);
+    policy.revision = "off".into();
+    apply_rewrites(&[prepare_rewrite(&target, &router, &policy).unwrap().unwrap()]).unwrap();
+    repair_codex_managed_ultra_target(&target.dir.join("config.toml"), &router, &default_aggregate_login_state(), false).unwrap();
+    let saved = fs::read_to_string(target.dir.join("config.toml")).unwrap();
+    assert_ne!(configured_root_value(&saved, "model_reasoning_effort").as_deref(), Some("ultra"));
+    assert_eq!(configured_root_value(&saved, "service_tier").as_deref(), Some("default"));
+    let catalog = read_json_if_exists(&path).unwrap().unwrap();
+    assert_ne!(codex_catalog_reasoning_effort(&catalog, model, Some("ultra")), "ultra");
+    let removed = fixture_policy(true, &["gpt-6-sol"], "removed");
+    apply_rewrites(&[prepare_rewrite(&target, &router, &removed).unwrap().unwrap()]).unwrap();
+    assert_eq!(codex_catalog_model_names(&read_json_if_exists(&path).unwrap().unwrap()), ["gpt-6-sol"]);
+}
+
+
+#[test]
+fn desktop_model_capabilities_clearing_or_removing_selected_fast_falls_back_only_when_owned() {
+    let model = "future-fast-model";
+    let enabled = validate_policy(&json!({"version":1,"enabled":true,"models":[model],"revision":"on",
+        "modelCapabilities":{model:{"supportsFast":true}}})).unwrap();
+    let mut before = build_codex_native_responses_catalog(&[model.into()]).unwrap();
+    apply_catalog_capabilities(&mut before, &enabled);
+    let old = format!("model = {}\nservice_tier = \"priority\"\n",json!(model));
+    let mut after = before.clone();
+    apply_catalog_capabilities(&mut after, &fixture_policy(true, &[model], "default"));
+    assert!(!codex_model_entry_declares_speed(&after["models"][0]));
+    let cleared = reconcile_previous_selection(&old, &old, &after, Some(&before)).unwrap();
+    assert_eq!(configured_root_value(&cleared, "service_tier").as_deref(), Some("default"));
+    assert_eq!(reconcile_previous_selection(&old, &old, &after, None).unwrap(), old);
+    let replacement = build_codex_native_responses_catalog(&["another-unknown-model".into()]).unwrap();
+    let next = "model = \"another-unknown-model\"\nservice_tier = \"priority\"\n";
+    let safe = reconcile_previous_selection(next, &old, &replacement, Some(&before)).unwrap();
+    assert_eq!(configured_root_value(&safe, "service_tier").as_deref(), Some("default"));
+}
+
+
+#[test]
+fn desktop_model_capabilities_restart_preserves_explicit_empty_native_reasoning() {
+    for native_levels in [json!([]), json!(["none"]), json!([{"effort":"none"}])] {
+        let directory = tempfile::tempdir().unwrap();
+        let (target, router, path, _) = relay_fixture(directory.path(), None);
+        let model = "future-nonreasoning";
+        let mut native = codex_native_responses_model_entry(model, 0);
+        native["supported_reasoning_levels"] = native_levels.clone();
+        fs::write(target.dir.join("models_cache.json"), serde_json::to_vec(&json!({"models":[native]})).unwrap()).unwrap();
+        let policy = validate_policy(&json!({"version":1,"enabled":true,"models":[model],"revision":"nonreasoning",
+            "modelCapabilities":{model:{"supportsUltra":true}}})).unwrap();
+        apply_rewrites(&[prepare_rewrite(&target, &router, &policy).unwrap().unwrap()]).unwrap();
+        repair_codex_managed_ultra_target(&target.dir.join("config.toml"), &router, &default_aggregate_login_state(), false).unwrap();
+        let catalog = read_json_if_exists(&path).unwrap().unwrap();
+        assert_eq!(catalog["models"][0]["supported_reasoning_levels"].as_array().unwrap().len(), if native_levels.as_array().unwrap().is_empty() { 0 } else { 1 });
+        assert_eq!(codex_catalog_reasoning_effort(&catalog, model, Some("ultra")), "none");
+        assert_eq!(configured_root_value(&fs::read_to_string(target.dir.join("config.toml")).unwrap(), "model_reasoning_effort").as_deref(), Some("none"));
+    }
+}
+
+
+#[test]
+fn desktop_model_capabilities_builtin_62_survive_legacy_policy_and_restart_repair() {
+    for model in ["gpt-6.2-astra", "gpt-6.2-sol"] {
+        let directory = tempfile::tempdir().unwrap();
+        let (target, router, path, _) = relay_fixture(directory.path(), None);
+        let policy = fixture_policy(true, &["gpt-5.6-sol", "gpt-5.6-terra", "gpt-6-astra",
+            "gpt-6-sol", "gpt-6.1-sol", "gpt-6.2-sol", "gpt-6.2-astra"], "unchanged-old-server");
+        assert!(policy.model_capabilities.is_empty());
+        apply_rewrites(&[prepare_rewrite(&target, &router, &policy).unwrap().unwrap()]).unwrap();
+        let mut catalog = read_json_if_exists(&path).unwrap().unwrap();
+        let entry = catalog["models"].as_array_mut().unwrap().iter_mut()
+            .find(|entry| entry["slug"] == model).unwrap();
+        entry["supported_reasoning_levels"] = json!([{"effort":"low"},{"effort":"medium"},
+            {"effort":"high"},{"effort":"xhigh"}]);
+        entry["additional_speed_tiers"] = json!([]);
+        entry["service_tiers"] = json!([]);
+        entry["native_custom_metadata"] = json!({"keep":"unchanged"});
+        // Refresh uses the native cache as source of truth, never a prior generated catalog.
+        fs::write(target.dir.join("models_cache.json"), serde_json::to_vec(&catalog).unwrap()).unwrap();
+        fs::write(&path, serde_json::to_vec(&catalog).unwrap()).unwrap();
+        let config_path = target.dir.join("config.toml");
+        let mut config = fs::read_to_string(&config_path).unwrap().parse::<toml_edit::Document>().unwrap();
+        config["model"] = toml_edit::value(model);
+        config["model_reasoning_effort"] = toml_edit::value("xhigh");
+        config["service_tier"] = toml_edit::value("default");
+        fs::write(&config_path, config.to_string()).unwrap();
+        // A repeated legacy revision must not prevent local capability upgrades.
+        if let Some(rewrite) = prepare_rewrite(&target, &router, &policy).unwrap() {
+            apply_rewrites(&[rewrite]).unwrap();
+        }
+        repair_codex_managed_ultra_target(&config_path, &router, &default_aggregate_login_state(), false).unwrap();
+        let repaired = read_json_if_exists(&path).unwrap().unwrap();
+        let entry = repaired["models"].as_array().unwrap().iter().find(|entry| entry["slug"] == model).unwrap();
+        assert!(entry.get("gaogeModelCapabilities").is_none());
+        assert_eq!(codex_catalog_reasoning_effort(&repaired, model, Some("ultra")), "ultra");
+        assert_eq!(entry["additional_speed_tiers"], json!(["fast"]));
+        assert!(entry["service_tiers"].as_array().unwrap().iter().any(|tier| tier["id"] == "priority"));
+        assert_eq!(entry["native_custom_metadata"], json!({"keep":"unchanged"}));
+        let saved = fs::read_to_string(&config_path).unwrap();
+        assert_eq!(configured_root_value(&saved, "model_reasoning_effort").as_deref(), Some("xhigh"));
+        assert_eq!(configured_root_value(&saved, "service_tier").as_deref(), Some("default"));
+        assert!(saved.contains("# user comment must remain"));
+        assert!(codex_api_speed_model_supported(&saved, model));
+        assert!(codex_api_speed_model_ids(&saved).contains(&model.to_string()));
+        let before = fs::read(&path).unwrap();
+        repair_codex_managed_ultra_target(&config_path, &router, &default_aggregate_login_state(), false).unwrap();
+        assert_eq!(fs::read(&path).unwrap(), before);
+    }
+}
+
+#[test]
+fn desktop_model_capabilities_builtin_62_still_respect_explicit_remote_revocation() {
+    for model in ["gpt-6.2-astra", "gpt-6.2-sol"] {
+        let mut catalog = build_codex_native_responses_catalog(&[model.into()]).unwrap();
+        assert_eq!(codex_catalog_reasoning_effort(&catalog, model, Some("ultra")), "ultra");
+        assert!(codex_model_entry_declares_speed(&catalog["models"][0]));
+        let policy = validate_policy(&json!({"version":1,"enabled":true,"models":[model],"revision":"disabled",
+            "modelCapabilities":{model:{"supportsUltra":false,"supportsFast":false}}})).unwrap();
+        apply_catalog_capabilities(&mut catalog, &policy);
+        let object = catalog["models"][0].as_object_mut().unwrap();
+        reconcile_codex_reasoning_levels(object, model);
+        reconcile_codex_speed_tiers(object, model);
+        assert_ne!(codex_catalog_reasoning_effort(&catalog, model, Some("ultra")), "ultra");
+        assert!(!codex_model_entry_declares_speed(&catalog["models"][0]));
+        apply_catalog_capabilities(&mut catalog, &fixture_policy(true, &[model], "legacy-again"));
+        assert_eq!(codex_catalog_reasoning_effort(&catalog, model, Some("ultra")), "ultra");
+        assert!(codex_model_entry_declares_speed(&catalog["models"][0]));
+    }
+}
+
+#[test]
+fn desktop_model_capabilities_future_models_still_need_explicit_declarations() {
+    for model in ["future-exact-model", "gpt-6.3-astra", "gpt-6.2-luna", "gpt-6.2-astra-unverified", "gpt-6.2-sol-unverified"] {
+        let mut catalog = build_codex_native_responses_catalog(&[model.into()]).unwrap();
+        assert_ne!(codex_catalog_reasoning_effort(&catalog, model, Some("ultra")), "ultra");
+        assert!(!codex_model_entry_declares_speed(&catalog["models"][0]));
+        let policy = validate_policy(&json!({"version":1,"enabled":true,"models":[model],"revision":"declared",
+            "modelCapabilities":{model:{"supportsUltra":true,"supportsFast":true}}})).unwrap();
+        apply_catalog_capabilities(&mut catalog, &policy);
+        assert_eq!(codex_catalog_reasoning_effort(&catalog, model, Some("ultra")), "ultra");
+        assert!(codex_model_entry_declares_speed(&catalog["models"][0]));
+    }
+}

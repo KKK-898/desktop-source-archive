@@ -678,6 +678,7 @@ if ([string]::IsNullOrWhiteSpace($remoteSourceTag)) {
 }
 Write-Info "release commit: $releaseSha"
 
+Initialize-BuildRepoVisibility
 Invoke-Checked node (Join-Path $script:Root "scripts/deployment-config.mjs") sync $script:ConfigPath $script:BuildRepo
 
 $bootstrapValue = (@(Get-Property $config "bootstrapConfigUrls" @()) -join ',')
@@ -687,7 +688,6 @@ Invoke-Checked gh variable set GAOGE_UPDATE_BASE_URL --body $primaryUpdateBase -
 Invoke-Checked gh variable set GAOGE_UPDATE_MINIMUM_VERSION --body $MinimumVersion --repo $script:BuildRepo
 
 $remoteBuildTag = Get-RemoteTagSha "https://github.com/$($script:BuildRepo).git" $tagName
-Initialize-BuildRepoVisibility
 if ([string]::IsNullOrWhiteSpace($remoteBuildTag)) {
   $buildSha = Export-BuildSnapshot $tagName $buildBranch
 } else {

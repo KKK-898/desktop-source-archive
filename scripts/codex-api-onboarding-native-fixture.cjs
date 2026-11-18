@@ -7,6 +7,9 @@ const { createHash } = require('node:crypto')
 // Only reviewed native leaf functions run, with in-memory storage/IPC and
 // synthetic identities. No Electron entry, credential reader or real file write.
 function nativeOnboardingFixture(packagePath) {
+  const version = JSON.parse(asar.extractFile(packagePath, 'package.json')).version
+  if (version === '26.1111.21308') return require('./codex-api-onboarding-content-owner-fixture.cjs').contentOwnerOnboardingFixture(packagePath)
+  assert.ok(['26.1103.32239', '26.1103.60933'].includes(version), 'Unreviewed native onboarding package: ' + version)
   const files = asar.listPackage(packagePath).map(name => name.replace(/^[\\/]/, ''))
   const sources = new Map()
   const read = file => { if (!sources.has(file)) sources.set(file, asar.extractFile(packagePath, file).toString()); return sources.get(file) }
@@ -73,7 +76,7 @@ function nativeOnboardingFixture(packagePath) {
     // sees normal main-process objects even before any renderer has published.
     const stateMethods=vm.runInThisContext('(function('+Object.keys(stateDeps).join(',')+'){return {'+mainMethods.selectRendererOwner+','+mainMethods.hasAccountScopedRendererState+'}})')(...Object.values(stateDeps))
     Object.defineProperties(globalState,Object.getOwnPropertyDescriptors(stateMethods))
-    const win={localStorage:{length:0,getItem:()=>null,removeItem:()=>{}},electronBridge:{getInitialSidebarBootstrap:()=>({accountScopedPersistence:accountScoped})}}
+    const win={localStorage:{length:0,getItem:()=>null,removeItem:()=>{}},electronBridge:{getInitialSidebarBootstrap:()=>({accountScopedPersistence:accountScoped}),getDesktopUserAgent:()=>`Codex Desktop/${version} (Windows NT 10.0; x64)`}}
     const persisted=instantiateModule('kpIY',{'waIq':{m:()=>{throw Error('No record merge expected')}},'owEK':{Uy:'synthetic-custom-sections'}},{window:win,setTimeout,clearTimeout})
     let currentPrincipal=principal, pendingAccountChange=null
     const mainHandler={globalState,windowManager:{accountWindows:{generation:0,isCovered:()=>false,renderersWithoutAccountState:new Set()},shouldSyncPersistedAtom:()=>true},

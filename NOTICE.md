@@ -11,9 +11,10 @@ this notice does not relicense them or establish ownership of their content.
 ## Corresponding source
 
 Public release-source repository:
-https://github.com/KKK-898/Gaoge-Free-Desktop
+https://github.com/KKK-898/desktop-source-archive
 
-The source for a released version is identified by its matching `v<version>` tag.
+The source for a released build is identified by the immutable `sourceReleaseTag`
+in its package metadata (`v<version>` or `v<version>-build.N`).
 `SOURCE_MANIFEST.json` in each exported release identifies the originating source
 commit, source tree and the SHA-256 and size of each included source file. The
 export includes local modifications, build scripts, package lockfiles, runtime

@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, nextTick, onMounted, onUnmounted, ref, watch, type Ref } from 'vue'
 import packageMetadata from '../../package.json'
+import releaseLicenseText from '../../LICENSE?raw'
 import TutorialVideoDialog from './TutorialVideoDialog.vue'
 import OfficialSubscriptionReferral from './OfficialSubscriptionReferral.vue'
 import OfficialSubscriptionSessionRecovery from './OfficialSubscriptionSessionRecovery.vue'
@@ -4026,8 +4027,6 @@ const projectOutsourcingWaitingCount = computed(() => visibleProjectOutsourcingR
 const projectOutsourcingApprovedCount = computed(() => visibleProjectOutsourcingRecords.value.filter((item) => item.status === 'approved').length)
 const projectOutsourcingRejectedCount = computed(() => visibleProjectOutsourcingRecords.value.filter((item) => item.status === 'rejected').length)
 const updateVersionText = computed(() => updateStatus.value.version || packageMetadata.version)
-// Link the installed build to its exact corresponding source, not the moving main branch.
-const releaseSourceUrl = `https://github.com/KKK-898/desktop-source-archive/tree/${packageMetadata.sourceReleaseTag}`
 const releaseLicenseUrl = `https://github.com/KKK-898/desktop-source-archive/blob/${packageMetadata.sourceReleaseTag}/LICENSE`
 const updateButtonText = computed(() => {
   if (updateStatus.value.state === 'restarting') return '正在重启...'
@@ -9015,6 +9014,9 @@ function codexApiModeFeedback(result?: GaogeDesktopCodexLaunchFeedback | null) {
   }
   if (status.reason === 'unsupported-runtime') {
     return { notice: '', warning: status.warnings?.join(' ') || '当前 Codex 版本的纯 API 编码模式尚未适配，尚未确认成功。', pending: false }
+  }
+  if (status.reason === 'unsupported-local-project-scope') {
+    return { notice: '', warning: '当前 Codex 的本地项目存储契约尚未验证，本次未改动项目分组。', pending: false }
   }
   if (status.verified === true && status.ready === true && status.enabled !== false
       && status.reason === 'coding' && !status.error) {
@@ -18770,20 +18772,18 @@ void [
               <strong>版本</strong>
               <small>{{ updateVersionText }}</small>
             </div>
-            <div class="new-theme-about-row">
-              <strong>开源代码</strong>
-              <button type="button" @click="openExternalUrl(releaseSourceUrl)">
-                <ExternalLink :size="15" />
-                获取本版本源码
-              </button>
-            </div>
-            <div class="new-theme-about-row">
-              <strong>开源许可</strong>
-              <button type="button" @click="openExternalUrl(releaseLicenseUrl)">
-                <ExternalLink :size="15" />
-                AGPL-3.0
-              </button>
-            </div>
+            <details class="new-theme-license-notice">
+              <summary class="new-theme-about-row">
+                <strong>开源声明</strong>
+                <ChevronRight :size="15" aria-hidden="true" />
+              </summary>
+              <div class="new-theme-license-content">
+                <p>© 2026 GaogeAI 及贡献者。你可以按 AGPL-3.0-only 修改和再分发本软件；除法律要求或另有书面约定外，本软件不提供担保。第三方组件保留各自的版权和许可。</p>
+                <label>许可证地址<input type="text" readonly :value="releaseLicenseUrl" /></label>
+                <p>要获取已发布版本的完整对应源码，可在上述仓库选择该版本的标签，再选择 Code → Download ZIP。</p>
+                <pre lang="en" tabindex="0" aria-label="AGPL-3.0-only 许可全文">{{ releaseLicenseText }}</pre>
+              </div>
+            </details>
             <div class="new-theme-about-row">
               <strong>检测更新</strong>
               <button type="button" :disabled="updateStatus.state === 'checking' || updateStatus.state === 'downloading'" @click="handleUpdateAction">
@@ -24796,6 +24796,48 @@ button {
 
 .new-theme-about-row button:hover {
   background: #f8fafc;
+}
+
+.new-theme-license-notice > summary {
+  cursor: pointer;
+  list-style: none;
+}
+
+.new-theme-license-notice > summary::-webkit-details-marker { display: none; }
+.new-theme-license-notice[open] > summary svg { transform: rotate(90deg); }
+.new-theme-license-notice > summary:focus-visible { outline-offset: -3px; }
+
+.new-theme-license-content {
+  display: grid;
+  gap: 0.65rem;
+  min-width: 0;
+  padding: 0 0.9rem 0.9rem;
+  color: var(--foreground);
+  font-size: 0.8rem;
+  line-height: 1.5;
+}
+
+.new-theme-license-content p { margin: 0; }
+.new-theme-license-content label { display: grid; gap: 0.25rem; }
+.new-theme-license-content input,
+.new-theme-license-content pre {
+  width: 100%;
+  min-width: 0;
+  margin: 0;
+  padding: 0.4rem 0.55rem;
+  border: 1px solid var(--border);
+  border-radius: 0.4rem;
+  background: var(--background);
+  color: inherit;
+  font-size: inherit;
+  user-select: text;
+}
+
+.new-theme-license-content pre {
+  max-height: 12rem;
+  overflow: auto;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
 }
 
 .new-theme-runtime-server-panel {

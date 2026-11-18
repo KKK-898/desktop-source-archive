@@ -10,6 +10,23 @@ pub(super) struct Policy {
     pub enabled: bool,
     pub models: Vec<String>,
     pub revision: String,
+    #[serde(default, rename = "modelCapabilities", skip_serializing_if = "std::collections::BTreeMap::is_empty")]
+    pub model_capabilities: std::collections::BTreeMap<String, ModelCapabilities>,
+}
+
+#[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub(super) struct ModelCapabilities {
+    #[serde(default, deserialize_with = "optional_capability", skip_serializing_if = "Option::is_none")]
+    pub supports_ultra: Option<bool>,
+    #[serde(default, deserialize_with = "optional_capability", skip_serializing_if = "Option::is_none")]
+    pub supports_fast: Option<bool>,
+}
+
+// Missing is legacy behavior. Explicit null, strings, and numbers are invalid,
+// never equivalent to a positive capability or a silently cleared override.
+fn optional_capability<'de, D: serde::Deserializer<'de>>(deserializer: D) -> Result<Option<bool>, D::Error> {
+    bool::deserialize(deserializer).map(Some)
 }
 
 #[derive(Clone, Debug)]
@@ -50,8 +67,119 @@ fn validate_policy(value: &Value) -> Result<Policy, String> {
     if policy.enabled && models.is_empty() {
         return Err("已启用的模型支持策略不能为空。".to_string());
     }
+    if policy.model_capabilities.len() > 100
+        || policy.model_capabilities.keys().any(|model| !models.contains(model))
+    {
+        return Err("模型能力声明必须对应当前模型名单。".to_string());
+    }
     policy.models = models;
     Ok(policy)
+}
+
+// Only generated, owned catalog entries receive these local bookkeeping fields.
+// Keep the original capability fields so removing a declaration restores legacy
+// behavior rather than treating our previous injection as independent metadata.
+const CAPABILITY_FIELDS: &[&str] = &[
+    "supported_reasoning_levels", "supportedReasoningEfforts", "supported_reasoning_efforts",
+    "default_reasoning_level", "multi_agent_version", "additional_speed_tiers", "service_tiers",
+    "additionalSpeedTiers", "serviceTiers",
+];
+
+pub(super) fn entry_override(entry: &Map<String, Value>, capability: &str) -> Option<bool> {
+    entry.get("gaogeModelCapabilities")?.get(capability)?.as_bool()
+}
+
+pub(super) fn restore_entry_capabilities(entry: &mut Map<String, Value>) {
+    if let Some(baseline) = entry.remove("gaogeCapabilityBaseline").and_then(|value| value.as_object().cloned()) {
+        for key in CAPABILITY_FIELDS {
+            match baseline.get(*key) {
+                Some(Value::Null) | None => { entry.remove(*key); }
+                Some(value) => { entry.insert((*key).into(), value.clone()); }
+            }
+        }
+    }
+    entry.remove("gaogeModelCapabilities");
+}
+
+pub(super) fn preserve_nonreasoning_declarations(catalog: &mut Value, targets: &[CodexDirTarget]) {
+    let mut seen = HashSet::new();
+    for path in codex_model_cache_paths(targets) {
+        let Ok(Some(cache)) = read_json_if_exists(&path) else { continue; };
+        for source in cache["models"].as_array().into_iter().flatten() {
+            let Some(id) = source["slug"].as_str() else { continue; };
+            if !seen.insert(id.to_string()) { continue; }
+            let Some(levels) = source["supported_reasoning_levels"].as_array() else { continue; };
+            if !levels.iter().all(|level| codex_reasoning_level_effort(level) == Some("none")) { continue; }
+            if let Some(entry) = catalog["models"].as_array_mut().into_iter().flatten()
+                .find(|entry| entry["slug"].as_str() == Some(id)) {
+                entry["supported_reasoning_levels"] = if levels.is_empty() { json!([]) } else { json!([codex_reasoning_level_entry("none")]) };
+                entry["default_reasoning_level"] = json!("none");
+            }
+        }
+    }
+}
+
+pub(super) fn apply_catalog_capabilities(catalog: &mut Value, policy: &Policy) {
+    for entry in catalog.get_mut("models").and_then(Value::as_array_mut).into_iter().flatten() {
+        let Some(model) = entry.get("slug").and_then(Value::as_str).map(str::to_owned) else { continue; };
+        let Some(object) = entry.as_object_mut() else { continue; };
+        restore_entry_capabilities(object);
+        if !policy.enabled { continue; }
+        let Some(capabilities) = policy.model_capabilities.get(&model) else { continue; };
+        if capabilities.supports_ultra.is_none() && capabilities.supports_fast.is_none() { continue; }
+        let baseline = CAPABILITY_FIELDS.iter().map(|key| ((*key).to_string(), object.get(*key).cloned().unwrap_or(Value::Null)))
+            .collect::<Map<_, _>>();
+        object.insert("gaogeCapabilityBaseline".into(), Value::Object(baseline));
+        object.insert("gaogeModelCapabilities".into(), serde_json::to_value(capabilities).expect("boolean capabilities serialize"));
+        reconcile_codex_reasoning_levels(object, &model);
+        reconcile_codex_multi_agent_version(object, &model);
+        reconcile_codex_speed_tiers(object, &model);
+    }
+}
+
+pub(super) fn catalog_ultra_overrides(catalog: &Value) -> Map<String, Value> {
+    catalog["models"].as_array().into_iter().flatten().filter_map(|entry| {
+        Some((entry["slug"].as_str()?.to_string(), json!(entry_override(entry.as_object()?, "supportsUltra")?)))
+    }).collect()
+}
+
+pub(super) fn reconcile_selected_capabilities(config: &str, catalog: &Value) -> Result<String, String> {
+    let model = configured_root_value(config, "model").unwrap_or_default();
+    let Some(entry) = catalog["models"].as_array().into_iter().flatten()
+        .find(|entry| entry["slug"].as_str() == Some(model.as_str())) else { return Ok(config.to_string()); };
+    let mut document = config.parse::<toml_edit::Document>().map_err(|_| "当前 Codex 配置无效。")?;
+    let mut changed = false;
+    if let Some(effort) = configured_root_value(config, "model_reasoning_effort") {
+        let safe = codex_catalog_reasoning_effort(catalog, &model, Some(&effort));
+        if safe != effort {
+            document["model_reasoning_effort"] = toml_edit::value(safe);
+            changed = true;
+        }
+    }
+    if entry.as_object().and_then(|object| entry_override(object, "supportsFast")) == Some(false)
+        && configured_root_value(config, "service_tier").is_some_and(|tier| matches!(tier.as_str(), "fast" | "priority"))
+    {
+        document["service_tier"] = toml_edit::value("default");
+        changed = true;
+    }
+    Ok(if changed { document.to_string() } else { config.to_string() })
+}
+
+pub(super) fn reconcile_previous_selection(config: &str, old_config: &str, catalog: &Value, previous: Option<&Value>) -> Result<String, String> {
+    let old_model = configured_root_value(old_config, "model").unwrap_or_default();
+    let owned_fast = previous.and_then(|catalog| catalog["models"].as_array()).into_iter().flatten()
+        .find(|entry| entry["slug"].as_str() == Some(old_model.as_str()))
+        .and_then(Value::as_object).and_then(|entry| entry_override(entry, "supportsFast")) == Some(true);
+    let selected = configured_root_value(config, "model").unwrap_or_default();
+    let next_supports_fast = catalog["models"].as_array().into_iter().flatten()
+        .find(|entry| entry["slug"].as_str() == Some(selected.as_str())).is_some_and(codex_model_entry_declares_speed);
+    if owned_fast && !next_supports_fast
+        && configured_root_value(config, "service_tier").is_some_and(|tier| matches!(tier.as_str(), "fast" | "priority")) {
+        let mut document = config.parse::<toml_edit::Document>().map_err(|_| "当前 Codex 配置无效。")?;
+        document["service_tier"] = toml_edit::value("default");
+        return Ok(document.to_string());
+    }
+    Ok(config.to_string())
 }
 
 fn parse_payload(payload: &Value) -> Result<Policy, String> {
@@ -191,6 +319,7 @@ fn usable(mut resolved: Resolution) -> Result<Resolution, String> {
             .policy
             .models
             .retain(|model| is_codex_conversation_model(model));
+        resolved.policy.model_capabilities.retain(|model, _| resolved.policy.models.contains(model));
         if resolved.policy.models.is_empty() {
             return Err(
                 "模型支持清单没有可用于对话的模型，已暂停写入；不会回退全量模型。".to_string(),
@@ -423,6 +552,12 @@ fn prepare_rewrite(
         };
     validate_codex_config_toml(&config)?;
     let mut catalog_value = restore_catalog.unwrap_or(resolved.catalog);
+    if policy.enabled {
+        preserve_nonreasoning_declarations(&mut catalog_value, std::slice::from_ref(target));
+        apply_catalog_capabilities(&mut catalog_value, policy);
+    }
+    let config = reconcile_selected_capabilities(&config, &catalog_value)?;
+    let config = reconcile_previous_selection(&config, &existing, &catalog_value, previous.as_ref())?;
     if policy.enabled {
         catalog_value["gaogeDesktopModelSupport"] = marker.cloned().unwrap_or_else(|| {
             json!({

@@ -15,7 +15,7 @@ const start = source.indexOf('  const pluginEnhancementsEnabled = window.__GAOGE
 const end = source.indexOf('\n})()\n"##', start)
 assert.ok(start >= 0 && end > start, 'the production injection orchestrator must be present')
 const orchestration = `(async () => {\n${source.slice(start, end)}\n})()`
-const loaderStart = source.indexOf('  async function loadCodexAppModule(namePart) {')
+const loaderStart = source.indexOf('  async function loadCodexAppModule(namePart, options = null) {')
 const loaderEnd = source.indexOf('\n  function restorePluginMarketplaceName(', loaderStart)
 assert.ok(loaderStart >= 0 && loaderEnd > loaderStart, 'the production module loader must be present')
 const createLoader = new Function('window', 'codexAppAssetUrl', 'setTimeout', 'clearTimeout',
@@ -287,3 +287,96 @@ test('disabling plugins during unresolved discovery retains the monitor but neve
   assert.equal(monitor.status().runtimeReady, false)
   monitor.dispose()
 })
+
+
+function guardedModuleUrl(slot, value) {
+  const source = 'globalThis[' + JSON.stringify(slot) + ']++; export const value = ' + JSON.stringify(value) + ';';
+  return 'data:text/javascript,' + encodeURIComponent('// guarded fixture ' + (++moduleFixtureId) + '\n' + source);
+}
+
+test('production guarded loader imports exact URLs with separate legacy and per-URL caches', async () => {
+  const slot = '__gaogeGuardedImport' + (++moduleFixtureId);
+  globalThis[slot] = 0;
+  const f = loaderFixture(["export const value = 'legacy';"]);
+  const firstUrl = guardedModuleUrl(slot, 'first-exact');
+  const secondUrl = guardedModuleUrl(slot, 'second-exact');
+  try {
+    const legacy = await completed(f.loader('same-filename-'));
+    const first = await completed(f.loader('same-filename-', { expectedUrl: firstUrl, validate: url => url === firstUrl }));
+    const repeat = await completed(f.loader('same-filename-', { expectedUrl: firstUrl, validate: url => url === firstUrl }));
+    const second = await completed(f.loader('same-filename-', { expectedUrl: secondUrl, validate: url => url === secondUrl }));
+    assert.equal(legacy.value, 'legacy');
+    assert.equal(first.value, 'first-exact');
+    assert.equal(repeat, first, 'exact-URL native namespace is reused');
+    assert.equal(second.value, 'second-exact', 'same name does not reuse a different URL');
+    assert.notEqual(first, second);
+    assert.equal(globalThis[slot], 2);
+    assert.equal(f.calls(), 1, 'guarded imports never consult the legacy filename resolver');
+    assert.deepEqual([...f.window.__gaogeCodexPluginModulePromises.keys()], ['same-filename-', 'guarded:' + firstUrl, 'guarded:' + secondUrl]);
+    assert.equal(f.timers.size, 0);
+  } finally { delete globalThis[slot]; }
+});
+
+test('production guarded loader revalidates immediately before the actual import microtask', async () => {
+  const slot = '__gaogeGuardedMicrotask' + (++moduleFixtureId);
+  globalThis[slot] = 0;
+  const f = loaderFixture(["throw Error('legacy lookup must not execute')"]);
+  const expectedUrl = guardedModuleUrl(slot, 'verified-after-retry');
+  let enabled = true;
+  const options = { expectedUrl, validate: url => enabled && url === expectedUrl };
+  try {
+    const pending = f.loader('same-filename-', options);
+    enabled = false;
+    assert.equal(await completed(pending), null);
+    assert.equal(globalThis[slot], 0, 'native module code must not run after invalidation');
+    assert.equal(f.window.__gaogeCodexPluginModulePromises.has('guarded:' + expectedUrl), false);
+    assert.equal(f.timers.size, 0);
+    enabled = true;
+    const retried = await completed(f.loader('same-filename-', options));
+    assert.equal(retried.value, 'verified-after-retry', 'positive control reaches actual native import');
+    assert.equal(globalThis[slot], 1);
+    assert.equal(f.calls(), 0);
+  } finally { delete globalThis[slot]; }
+});
+
+test('production guarded loader revalidates cached namespaces before and after awaiting reuse', async () => {
+  const slot = '__gaogeGuardedCache' + (++moduleFixtureId);
+  globalThis[slot] = 0;
+  const f = loaderFixture([null]);
+  const expectedUrl = guardedModuleUrl(slot, 'cached');
+  let enabled = true;
+  const options = { expectedUrl, validate: url => enabled && url === expectedUrl };
+  try {
+    const original = await completed(f.loader('same-filename-', options));
+    assert.equal(original.value, 'cached');
+    enabled = false;
+    assert.equal(await completed(f.loader('same-filename-', options)), null, 'invalid initial state cannot reuse cache');
+    enabled = true;
+    const reuse = f.loader('same-filename-', options);
+    enabled = false;
+    assert.equal(await completed(reuse), null, 'invalidation during cached-promise await is respected');
+    enabled = true;
+    assert.equal(await completed(f.loader('same-filename-', options)), original);
+    assert.equal(globalThis[slot], 1);
+    assert.equal(f.calls(), 0);
+    assert.equal(f.timers.size, 0);
+  } finally { delete globalThis[slot]; }
+});
+
+test('production guarded loader rejects malformed or throwing guards without importing', async () => {
+  const slot = '__gaogeGuardedReject' + (++moduleFixtureId);
+  globalThis[slot] = 0;
+  const f = loaderFixture([null]);
+  const expectedUrl = guardedModuleUrl(slot, 'must-not-run');
+  try {
+    for (const options of [
+      {}, { expectedUrl }, { expectedUrl: '', validate: () => true },
+      { expectedUrl, validate: () => 'truthy' },
+      { expectedUrl, validate: () => { throw Error('invalidated'); } },
+    ]) assert.equal(await completed(f.loader('same-filename-', options)), null);
+    assert.equal(globalThis[slot], 0);
+    assert.equal(f.window.__gaogeCodexPluginModulePromises, undefined);
+    assert.equal(f.calls(), 0);
+    assert.equal(f.timers.size, 0);
+  } finally { delete globalThis[slot]; }
+});

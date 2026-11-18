@@ -9,6 +9,13 @@ let packagePath = process.env.CODEX_API_MODE_ASAR || process.env.CODEX_NATIVE_AP
 let unavailable = ''
 if (!packagePath) { try { packagePath = installedAsar() } catch (error) { unavailable = error.message } }
 const run = (name,fn) => test(name,{skip:!packagePath && ('Installed Codex is required: '+unavailable),timeout:20000},fn)
+// Keep the 26 legacy restore/CAS assertions intact for their reviewed host.
+// The modern host preserves shared state natively and must exercise its own
+// positive persistence contract instead of pretending startup clears projects.
+const nativeVersion = packagePath ? JSON.parse(require('@electron/asar').extractFile(packagePath, 'package.json')).version : null
+if (nativeVersion === '26.1111.21308') {
+  require('./codex-api-project-shared-state.test.cjs')
+} else {
 const fixture = packagePath ? nativeProjectStateFixture(packagePath) : null
 const runtime = fs.readFileSync(path.join(__dirname,'../src-tauri/src/codex_api_mode_runtime.js'),'utf8')
 const bindingsSource = fs.readFileSync(path.join(__dirname,'../src-tauri/src/codex_api_mode_bindings.js'),'utf8')
@@ -19,6 +26,7 @@ const project = (id,name) => ({id,name,rootPaths:['C:/synthetic/'+name],createdA
 const definition = {'server-alpha':project('server-alpha','Alpha'),'server-beta':project('server-beta','Beta')}
 const assignments = {threadA:{projectKind:'local',projectId:'server-alpha'},threadB:{projectKind:'local',projectId:'server-beta'}}
 const checkpointKey = 'gaoge:api-local-projects-hydrated-v1'
+const apiState = snapshot => ({apiCodingModeEnabled:true,apiLocalProjects:snapshot})
 const checkpointReceipt = revision => ({version:1,revision,nonce:'synthetic-checkpoint-'+revision})
 const nativeCheckpoint = t => t.h.state.get('electron-persisted-atom-state')?.[checkpointKey]
 const payload = () => ({version:1,revision:1,checkpoint:checkpointReceipt(1),runtimeRevision:7,scope:'synthetic-scope',globals:{
@@ -28,7 +36,7 @@ const payload = () => ({version:1,revision:1,checkpoint:checkpointReceipt(1),run
 async function harness(options={}) {
  const h = fixture.create({catalog:{legacy:project('legacy','Official')},serverProjects:Object.values(definition).map(p=>({...p,roots:p.rootPaths.map(path=>({path})),metadata:{}})),...options})
  await h.initialize()
- let state={apiLocalProjects:payload()},current=true,saved=structuredClone(state.apiLocalProjects),commits=[]
+ let state=apiState(payload()),current=true,saved=structuredClone(state.apiLocalProjects),commits=[]
  const bindings={appServices:h.services,localOnboarding:createOnboarding([h.record],{window:h.window})}
  const bridge=async(route,input)=>{
   assert.equal(route,'/projects/local-state');commits.push(structuredClone(input))
@@ -37,7 +45,7 @@ async function harness(options={}) {
   const result={ok:true,apiLocalProjects:saved};return options.onCommitted?options.onCommitted(result):result
  }
  const guard=createGuard(bindings,{getState:()=>state,bridge})
- return {h,guard,commits,bindings,bridge,get saved(){return saved},get state(){return state},setState:value=>{state=value},setCurrent:value=>{current=value},sync:()=>guard.synchronize(state.apiLocalProjects,()=>current)}
+ return {h,guard,commits,bindings,bridge,get saved(){return saved},get state(){return state},setState:patch=>{state={...state,...patch}},setCurrent:value=>{current=value},sync:()=>guard.synchronize(state.apiLocalProjects,()=>current)}
 }
 run('real main owner selection clears desktop catalog while app-server projects survive',async()=>{
  const t=await harness();assert.equal(t.h.state.get('local-projects'),null)
@@ -63,7 +71,7 @@ run('API rename removal and explicit projectless edits persist without replaying
  assert.equal(t.saved.globals['local-projects']['server-alpha'].name,'Renamed');assert.equal(t.saved.globals['local-projects']['server-beta'],undefined)
  assert.deepEqual(plain(t.saved.memberships),{assignments:{threadA:assignments.threadA},projectlessThreadIds:['threadB']})
  const h=fixture.create();await h.initialize()
- const state={apiLocalProjects:t.saved};const next=createGuard({appServices:h.services,localOnboarding:createOnboarding([h.record],{window:h.window})},{getState:()=>state,bridge:async(_,input)=>({ok:true,apiLocalProjects:{...t.saved,revision:t.saved.revision+1,checkpoint:checkpointReceipt(t.saved.revision+1),...input}})})
+ const state=apiState(t.saved);const next=createGuard({appServices:h.services,localOnboarding:createOnboarding([h.record],{window:h.window})},{getState:()=>state,bridge:async(_,input)=>({ok:true,apiLocalProjects:{...t.saved,revision:t.saved.revision+1,checkpoint:checkpointReceipt(t.saved.revision+1),...input}})})
  await next.synchronize(t.saved,()=>true);assert.equal(next.status().ready,true,JSON.stringify(next.status()))
  assert.equal((await h.services.projectCatalog.readLocalProjects())['server-beta'],undefined)
  assert.deepEqual(plain(await h.services.threadProjectAssignments.readMemberships()),plain(t.saved.memberships))
@@ -256,7 +264,7 @@ run('a fresh guard honors matched native checkpoint deletions and membership cha
   await t.h.services.applicationState.write('electron-saved-workspace-roots',removeAll?[]:['C:/synthetic/Beta'])
   await t.h.services.applicationState.write('electron-workspace-root-labels',removeAll?{}:{'C:/synthetic/Beta':'Beta'})
   await t.h.services.threadProjectAssignments.restoreMemberships(Object.keys(assignments).map(threadId=>({threadId,assignment:removeAll?null:{projectKind:'local',projectId:'server-beta'},projectless:removeAll,hostId:'local'})))
-  const state={apiLocalProjects:snapshot},next=createGuard(t.bindings,{getState:()=>state,bridge:t.bridge})
+  const state=apiState(snapshot),next=createGuard(t.bindings,{getState:()=>state,bridge:t.bridge})
   await next.synchronize(snapshot,()=>true);assert.equal(next.status().ready,true,JSON.stringify(next.status()))
   assert.equal(t.saved.globals['local-projects']['server-alpha'],undefined)
   assert.deepEqual(plain(t.saved.globals['local-projects']),removeAll?{}:{'server-beta':definition['server-beta']})
@@ -268,12 +276,12 @@ run('a mismatched native checkpoint waits for a fresh snapshot before treating l
  const t=await harness();await t.sync();const currentSnapshot=structuredClone(t.saved);t.guard.dispose()
  await t.h.services.threadProjectAssignments.restoreMemberships(Object.keys(assignments).map(threadId=>({threadId,assignment:null,projectless:true,hostId:'local'})))
  await t.h.services.applicationState.write('local-projects',{})
- let state={apiLocalProjects:payload()};const next=createGuard(t.bindings,{getState:()=>state,bridge:t.bridge}),beforeCommits=t.commits.length,beforePublishes=t.h.publishes.length
+ let state=apiState(payload());const next=createGuard(t.bindings,{getState:()=>state,bridge:t.bridge}),beforeCommits=t.commits.length,beforePublishes=t.h.publishes.length
  await next.synchronize(state.apiLocalProjects,()=>true)
  assert.equal(next.status().ready,false);assert.equal(next.status().reason,'awaiting-current-local-project-snapshot');assert.equal(next.status().hydrated,false)
  assert.equal(t.commits.length,beforeCommits);assert.equal(t.h.publishes.length,beforePublishes)
  assert.deepEqual(plain(await t.h.services.projectCatalog.readLocalProjects()),{})
- state={apiLocalProjects:currentSnapshot};await next.synchronize(state.apiLocalProjects,()=>true)
+ state=apiState(currentSnapshot);await next.synchronize(state.apiLocalProjects,()=>true)
  assert.equal(next.status().ready,true,JSON.stringify(next.status()));assert.equal(t.commits.at(-1).expectedRevision,currentSnapshot.revision)
  assert.deepEqual(plain(t.saved.globals['local-projects']),{});next.dispose()
 })
@@ -285,3 +293,5 @@ run('foreign or malformed native checkpoints never authorize initial snapshot re
   assert.deepEqual(plain(await t.h.services.projectCatalog.readLocalProjects()),{})
  }
 })
+
+}

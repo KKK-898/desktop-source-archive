@@ -73,7 +73,7 @@ fn read_json(path: &Path) -> Result<Option<Value>, String> {
     Ok(read_json_bytes(path)?.map(|(value, _)| value))
 }
 
-fn read_json_bytes(path: &Path) -> Result<Option<(Value, Vec<u8>)>, String> {
+pub(super) fn read_bounded_bytes(path: &Path) -> Result<Option<Vec<u8>>, String> {
     let metadata = match fs::symlink_metadata(path) {
         Ok(metadata) => metadata,
         Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(None),
@@ -83,6 +83,14 @@ fn read_json_bytes(path: &Path) -> Result<Option<(Value, Vec<u8>)>, String> {
         return Err("本地项目状态文件类型或大小不受支持，已保留原文件。".into());
     }
     let bytes = fs::read(path).map_err(|_| "读取本地项目状态文件失败。")?;
+    if bytes.len() as u64 > MAX_FILE_SIZE {
+        return Err("本地项目状态文件超过支持范围，已保留原文件。".into());
+    }
+    Ok(Some(bytes))
+}
+
+fn read_json_bytes(path: &Path) -> Result<Option<(Value, Vec<u8>)>, String> {
+    let Some(bytes) = read_bounded_bytes(path)? else { return Ok(None); };
     let value =
         serde_json::from_slice(&bytes).map_err(|_| "本地项目状态文件格式无效，已保留原文件。")?;
     Ok(Some((value, bytes)))
@@ -443,6 +451,10 @@ fn read_locked(home: &Path) -> Result<Option<Snapshot>, String> {
 }
 
 fn write_locked(home: &Path, snapshot: &Snapshot) -> Result<(), String> {
+    write_locked_if(home, snapshot, &|| Ok(()))
+}
+
+fn write_locked_if(home: &Path, snapshot: &Snapshot, verify: &dyn Fn() -> Result<(), String>) -> Result<(), String> {
     let bytes = serde_json::to_vec_pretty(snapshot).map_err(|_| "无法编码本地项目缓存。")?;
     if bytes.len() as u64 > MAX_FILE_SIZE {
         return Err("本地项目缓存超过支持范围，未覆盖原文件。".into());
@@ -453,6 +465,10 @@ fn write_locked(home: &Path, snapshot: &Snapshot) -> Result<(), String> {
         .write_all(&bytes)
         .and_then(|_| temporary.as_file().sync_all())
         .map_err(|_| "写入本地项目缓存临时文件失败。")?;
+    if super::codex_project_compat::has_native_global_state_db(home) {
+        return Err("原生全局存储已改变，保留已有本地项目缓存。".into());
+    }
+    verify()?;
     temporary
         .persist(home.join(SNAPSHOT_FILE))
         .map_err(|_| "原子替换本地项目缓存失败，原文件保持有效。")?;
@@ -793,7 +809,13 @@ pub(super) fn read(home: &Path) -> Result<Option<Value>, String> {
     let _guard = SNAPSHOT_LOCK.lock().map_err(|_| "本地项目缓存锁不可用。")?;
     let snapshot = read_locked(home)?;
     if snapshot.is_none() {
+        if super::codex_project_compat::has_native_global_state_db(home) {
+            return Ok(None);
+        }
         if let Some(source) = read_json(&home.join(GLOBAL_STATE_FILE))? {
+            if super::codex_project_compat::has_content_owner_state(&source) {
+                return Ok(None);
+            }
             reject_unavailable_account_catalog(&source)?;
             if source
                 .get(CATALOG)
@@ -820,9 +842,23 @@ pub(super) fn prepare_with_databases(
     source: &Value,
     state_paths: &[PathBuf],
 ) -> Result<Option<Value>, String> {
+    prepare_if_current(home, source, state_paths, &|| Ok(()))
+}
+
+pub(super) fn prepare_if_current(
+    home: &Path,
+    source: &Value,
+    state_paths: &[PathBuf],
+    verify: &dyn Fn() -> Result<(), String>,
+) -> Result<Option<Value>, String> {
     let _guard = SNAPSHOT_LOCK.lock().map_err(|_| "本地项目缓存锁不可用。")?;
+    verify()?;
     if let Some(snapshot) = read_locked(home)? {
         return Ok(Some(snapshot.payload()));
+    }
+    if super::codex_project_compat::has_native_global_state_db(home)
+        || super::codex_project_compat::has_content_owner_state(source) {
+        return Ok(None);
     }
     reject_unavailable_account_catalog(source)?;
     let mapping = trusted_mapping(home, source)?;
@@ -831,7 +867,7 @@ pub(super) fn prepare_with_databases(
     };
     let (memberships, local_thread_ids) = initial_memberships(home, source, &globals, state_paths)?;
     let snapshot = new_snapshot(home, globals, memberships, true, local_thread_ids)?;
-    write_locked(home, &snapshot)?;
+    write_locked_if(home, &snapshot, verify)?;
     Ok(Some(snapshot.payload()))
 }
 
@@ -849,6 +885,10 @@ pub(super) fn capture_with_databases(
 ) -> Result<Option<Value>, String> {
     let _guard = SNAPSHOT_LOCK.lock().map_err(|_| "本地项目缓存锁不可用。")?;
     let existing = read_locked(home)?;
+    if super::codex_project_compat::has_native_global_state_db(home)
+        || super::codex_project_compat::has_content_owner_state(source) {
+        return Ok(existing.map(|snapshot| snapshot.payload()));
+    }
     let known = existing
         .as_ref()
         .map(|snapshot| catalog_ids(&snapshot.globals))
@@ -1055,19 +1095,37 @@ pub(super) fn commit(
     globals: &Value,
     memberships: &Value,
 ) -> Result<Value, String> {
-    let _guard = SNAPSHOT_LOCK.lock().map_err(|_| "本地项目缓存锁不可用。")?;
-    let existing = read_locked(home)?;
     let native = read_json(&home.join(GLOBAL_STATE_FILE))?.unwrap_or_else(|| json!({}));
+    commit_if_current(home, &native, expected_revision, globals, memberships, &|| Ok(()))
+}
+
+pub(super) fn commit_if_current(
+    home: &Path,
+    native: &Value,
+    expected_revision: u64,
+    globals: &Value,
+    memberships: &Value,
+    verify: &dyn Fn() -> Result<(), String>,
+) -> Result<Value, String> {
+    let _guard = SNAPSHOT_LOCK.lock().map_err(|_| "本地项目缓存锁不可用。")?;
+    verify()?;
+    if super::codex_project_compat::has_native_global_state_db(home) {
+        return Err("原生全局状态可能已迁移，无法验证此前项目归属，未修改缓存。".into());
+    }
+    if super::codex_project_compat::has_content_owner_state(native) {
+        return Err("当前原生项目范围未验证，未修改本地项目缓存。".into());
+    }
+    let existing = read_locked(home)?;
     let (snapshot, changed) = apply_readback(
         home,
         existing,
-        &native,
+        native,
         expected_revision,
         globals,
         memberships,
     )?;
     if changed {
-        write_locked(home, &snapshot)?;
+        write_locked_if(home, &snapshot, verify)?;
     }
     Ok(snapshot.payload())
 }
@@ -1079,6 +1137,9 @@ pub(super) fn commit(
 /// Missing/old receipts or an absent catalog defer without modifying files.
 pub(super) fn finalize_native_state(home: &Path, scope: &str) -> Result<Option<Value>, String> {
     let _guard = SNAPSHOT_LOCK.lock().map_err(|_| "本地项目缓存锁不可用。")?;
+    if super::codex_project_compat::has_native_global_state_db(home) {
+        return Ok(None);
+    }
     let auth_path = home.join("auth.json");
     let Some((auth, auth_bytes)) = read_json_bytes(&auth_path)? else {
         return Ok(None);
@@ -1096,7 +1157,7 @@ pub(super) fn finalize_native_state(home: &Path, scope: &str) -> Result<Option<V
     let Some((native, native_bytes)) = read_json_bytes(&state_path)? else {
         return Ok(None);
     };
-    if native
+    if super::codex_project_compat::has_content_owner_state(&native) || native
         .get("electron-account-renderer-state-v1")
         .and_then(|state| state.get("owner"))
         != Some(&Value::Null)
@@ -1151,7 +1212,8 @@ pub(super) fn finalize_native_state(home: &Path, scope: &str) -> Result<Option<V
     )?;
     // Reject a restart/account switch race instead of committing a projection
     // from an older root file. No original auth or native state is written.
-    if read_json_bytes(&auth_path)?.map(|(_, bytes)| bytes) != Some(auth_bytes)
+    if super::codex_project_compat::has_native_global_state_db(home)
+        || read_json_bytes(&auth_path)?.map(|(_, bytes)| bytes) != Some(auth_bytes)
         || read_json_bytes(&state_path)?.map(|(_, bytes)| bytes) != Some(native_bytes)
     {
         return Err("原生状态在最终保存前发生变化，已保留本地项目缓存，请重试。".into());

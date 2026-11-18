@@ -1,6 +1,7 @@
 const assert = require('node:assert/strict')
 const asar = require('@electron/asar')
 const ts = require('typescript')
+const crypto = require('node:crypto')
 
 // Reviewed framework/library closures in Codex 26.1029 and 26.1103. This is a
 // fail-closed test fixture, not a general application loader. App services,
@@ -18,6 +19,14 @@ bGpk HORo DiaP tOqE qlZC E3aD Plwd hqyJ jato Ziic X1EY BqFM j39m FoIM S24d
 SbMF j6bk axJ9 hKWB iQiC FcqJ wNyR k7fB Gk2I LTmb OjgC ulIE wkhw Sv71 SOuP
 w0ay mmUB y5DF iwK1 vMlG zTeN
 `.trim().split(/\s+/))
+// 26.1111 subscription/effect bridges were reviewed in full: only finite
+// framework imports, WeakMap/Map bookkeeping and deferred callbacks. No app
+// services, account state, network, storage or dynamic evaluation. These two
+// mutually dependent additions are pinned by exact factory digest, not merely ID.
+const REVIEWED_261111_MODULES = {
+  "XNFm": "5e25c82868dc906ed462cc99fc84dee3a4aeae6ac2c5a5bace1dae8f556f27ea",
+  "oFsh": "a40827c2eb828f362ec24de6c32d81ffa4c115199e19219dd3982e4fbbc07466"
+}
 const FRAMEWORK_ROOTS = ['zd8w', 'i5yi', 'suje', 'tyzk', 'hffr', 'UQAX', 'jwtq']
 // The 26.1103 Maitai bundle consolidates query construction, React hooks and
 // providers into zTeN. iwK1 tracks query snapshots; vMlG only exports Symbols.
@@ -76,8 +85,12 @@ function nativeWebpackFixture(packagePath) {
   const closure = new Map(), loaderProperties = new Set()
   function include(id) {
     if (closure.has(id)) return
-    assert.ok(REVIEWED_FRAMEWORK_MODULES.has(id), `Unreviewed framework dependency ${id}; refusing application initialization`)
+    assert.ok(REVIEWED_FRAMEWORK_MODULES.has(id) || Object.hasOwn(REVIEWED_261111_MODULES, id), `Unreviewed framework dependency ${id}; refusing application initialization`)
     const record = moduleSource(id)
+    if (Object.hasOwn(REVIEWED_261111_MODULES, id)) {
+      assert.equal(crypto.createHash('sha256').update(record.source).digest('hex'), REVIEWED_261111_MODULES[id],
+        `Reviewed subscription bridge ${id} changed; refusing native initialization`)
+    }
     closure.set(id, record)
     const requireName = record.node.parameters[2]?.name.getText(record.tree)
     const dependencies = new Set()
@@ -120,6 +133,9 @@ function nativeWebpackFixture(packagePath) {
   const appName = 'assets/348410.synthetic.js'
   const browserModule = `// Isolated installed-package framework exports; no application entry code.\n
 const modules = {${[...closure.values()].map(record => record.source).join(',\n')},${initialSource}};
+// Model the installed Rspack entry signature without starting its application.
+const __fuel_runtimeChunk = { __rspack_esm_ids: [348410], __webpack_modules__: modules };
+void __fuel_runtimeChunk.__rspack_esm_ids; void __fuel_runtimeChunk.__webpack_modules__;
 const cache = Object.create(null);
 const own = (object, key) => Object.prototype.hasOwnProperty.call(object, key);
 function requireNative(id) {

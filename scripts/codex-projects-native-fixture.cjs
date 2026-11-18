@@ -1,9 +1,42 @@
 const assert = require('node:assert/strict')
+const { createHash } = require('node:crypto')
 const vm = require('node:vm')
 const path = require('node:path')
+const { isDeepStrictEqual } = require('node:util')
 const asar = require('@electron/asar')
 const ts = require('typescript')
 const { nativeWebpackApiFixture } = require('./codex-api-mode-webpack-native-fixture.cjs')
+
+// First entry in each pair is the desktop copy in 26.1111.21308. index.html
+// loads 348410; its loader explicitly requests 982888, not 760507.
+const desktopCopies1111 = {
+  E7Ps: [
+    ['webview/assets/348410.374a9b8f98.js', 'e1b00ae1070241f273aa6b630f097076c8ffb0015748353a6c717d4324bec603'],
+    ['webview/assets/async/9921.9e1b993ce9.js', '43c7144d3099b6bf384eba2cc99b8588faabd82b39f06b7d0386ef16f42c7655'],
+  ],
+  HI9o: [
+    ['webview/assets/348410.374a9b8f98.js', 'a468b1d8f514089815453c863ad10deb538d55420cfbe28eb4ee19ec9af21e9a'],
+    ['webview/assets/async/9921.9e1b993ce9.js', '66a3a3dc2f037c1bf4a6be0c8947995b02975f4e86f81a4ef679ac9afe366223'],
+  ],
+  tQ31: [
+    ['webview/assets/async/982888.5f362a59ae.js', 'be62937a258ccbeb6e32e20d9e86cd8c3872c7f74fd0c645392fd7f4a25522a6'],
+    ['webview/assets/async/760507.0d634a5b8f.js', '94b491e10184ddf19e62a5bdf4490e1aba571a8a4789b7326c175f30bb89bfe3'],
+  ],
+}
+
+function selectProjectFactoryCopy(id, copies, reviewed) {
+  if (!reviewed) {
+    assert.equal(copies.length, 1, 'Expected exactly one native project factory: ' + id)
+    return copies[0]
+  }
+  const byFile = new Map(copies.map(copy => [copy.file.replaceAll('\\', '/'), copy]))
+  assert.equal(byFile.size, copies.length, 'Duplicate native project factory in one chunk: ' + id)
+  assert.deepEqual([...byFile.keys()].sort(), reviewed.map(([file]) => file).sort(), 'Unreviewed set of native project copies: ' + id)
+  for (const [file, sha256] of reviewed) {
+    assert.equal(createHash('sha256').update(byFile.get(file).source).digest('hex'), sha256, 'Unreviewed native project copy: ' + id + ' in ' + file)
+  }
+  return byFile.get(reviewed[0][0])
+}
 
 // Executes reviewed selector factories from the installed ASAR, never an app
 // entry point. IPC, query scheduling, persistence, thread pages, remote hosts and
@@ -12,35 +45,40 @@ const { nativeWebpackApiFixture } = require('./codex-api-mode-webpack-native-fix
 function nativeProjectsFixture(packagePath) {
   const apiFixture = nativeWebpackApiFixture(packagePath)
   const files = asar.listPackage(packagePath).map(file => file.replace(/^[\\/]/, ''))
-  const records = new Map()
+  const candidates = new Map()
+  const splitHelpers = apiFixture.packageVersion === '26.1111.21308'
   const needed = new Set([
     'Wbxh', 'qj4H', 'ndjw', 'XsHM', 'XyS0', 's6B0', 'DZgh', 'pSzu', 'cpC0',
     'V0vl', 'DVsG', 'Xqyo', 'UxLy', 'CnPR', 'h54q', 'FHI1', 'sHm2', 'gLQa',
     'WVuR', 'pQ7w', 'RFDv', 'HI9o', 'CiYY', 'I3ol', 'ZRtB', 'N2rm', 'EIJx',
     'yJ6f', 'bnxy', 'ZIaK', 'r8w8', 'E7Ps', 'Rrp3', 'Pfrd', 'dPHU', 'y5af', 'YTFQ', 'wHcA',
+    ...(splitHelpers ? ['tQ31', 'XNy1', 'hu8h'] : []),
   ])
-  const markers = [
-    'groups:Y,individualProjects:Y', 'thread-project-membership-host-ids',
-    'function(e){return a(e).replace(/',
-  ]
+  // Shared project helpers can move to another chunk without changing their
+  // factory IDs (26.1111). The AST below still admits only the reviewed IDs.
+  const mayContainFactory = new RegExp(`(?:^|[,{])\\s*["']?(?:${[...needed].join('|')})["']?\\s*\\(`)
+  const legacyMarkers = ['groups:Y,individualProjects:Y', 'thread-project-membership-host-ids', 'function(e){return a(e).replace(/', 'bnxy(e,t,n)']
   for (const file of files) {
     if (!/^webview[\\/]assets[\\/].*\.js$/.test(file)) continue
     const source = asar.extractFile(packagePath, file).toString()
-    if (!markers.some(marker => source.includes(marker)) && !source.includes('bnxy(e,t,n)')) continue
+    if (splitHelpers ? !mayContainFactory.test(source) : !legacyMarkers.some(marker => source.includes(marker))) continue
     const tree = ts.createSourceFile(file, source, ts.ScriptTarget.Latest, true, ts.ScriptKind.JS)
     function visit(node) {
       if (ts.isMethodDeclaration(node) && node.body && node.parameters.length === 3 && ts.isObjectLiteralExpression(node.parent)) {
-        const id = node.name.getText(tree).replace(/^"|"$/g, '')
+        const id = node.name.text
         if (needed.has(id)) {
-          const text = node.getText(tree)
-          if (text.length > (records.get(id)?.source.length ?? 0)) records.set(id, { id, source: text, file })
+          if (!candidates.has(id)) candidates.set(id, [])
+          candidates.get(id).push({ id, source: node.getText(tree), file })
         }
       }
       ts.forEachChild(node, visit)
     }
     visit(tree)
   }
-  assert.deepEqual([...needed].filter(id => !records.has(id)), [], 'Reviewed native project closure changed')
+  assert.deepEqual([...needed].filter(id => !candidates.has(id)), [], 'Reviewed native project closure changed')
+  const records = new Map([...candidates].map(([id, copies]) => [id, splitHelpers
+    ? selectProjectFactoryCopy(id, copies, desktopCopies1111[id])
+    : copies.reduce((best, copy) => copy.source.length > best.source.length ? copy : best)]))
   assert.match(records.get('Wbxh').source, /projectCatalog/)
   assert.match(records.get('Wbxh').source, /readMemberships\(\)/)
   assert.match(records.get('DZgh').source, /hasLoadedProjectSources/)
@@ -143,7 +181,8 @@ function nativeProjectsFixture(packagePath) {
     cache('NntY', { nv: () => null })
     cache('fqor', { N: value => value })
     cache('qFmb', {})
-    cache('hu8h', {})
+    // 26.1111 delegates final project keys to this real shared factory.
+    if (!splitHelpers) cache('hu8h', {})
     cache('nZMd', Object.fromEntries)
     cache('HFi9', (items, key) => items.reduce((groups, item) => { (groups[key(item)] ??= []).push(item); return groups }, {}))
     cache('nuXe', items => [...new Set(items)])
@@ -232,6 +271,16 @@ function nativeProjectsFixture(packagePath) {
     cache('cuMn', { Z_: constant([]) })
     cache('Yf5O', { Cg: constant([]) })
     cache('pyoT', { visiblePinnedSpaceItemKeys$: constant([]) })
+    if (splitHelpers) {
+      // Native memoization and pending-membership transforms run as shipped.
+      // Their cache and equality boundaries only receive the synthetic data.
+      cache('jWwv', Map)
+      cache('SZCv', isDeepStrictEqual)
+      cache('Noom', { visiblePinnedSpaceItemKeys$: constant([]) })
+      // s6B0 imports the new-task computer preference only for initialization;
+      // selectors under test must not read or change this separate preference.
+      cache('OM3m', new Proxy({}, { get: (_, key) => deny('computer preference ' + String(key))() }))
+    }
 
     registry.n = value => () => value
     registry.j = 348410
@@ -300,4 +349,4 @@ function nativeProjectsFixture(packagePath) {
   }
   return { createHarness, records, packageVersion: apiFixture.packageVersion }
 }
-module.exports = { nativeProjectsFixture }
+module.exports = { nativeProjectsFixture, selectProjectFactoryCopy }

@@ -77,9 +77,32 @@ OWNER_RELEASE_EVIDENCE_SHA256 = "a95d09b14f963a65fe2a07e6cd3929a85c83a10185fc7af
 OWNER_RELEASE_SCOPE_COUNT = 50
 
 
-def owner_release_scope(paths):
-    data = paths.get(OWNER_RELEASE_EVIDENCE_PATH)
-    if data is None or sha(data) != OWNER_RELEASE_EVIDENCE_SHA256:
+# Each release has a separate immutable direction record. This is not a general
+# waiver: unknown versions and changed evidence or asset bytes remain blocked.
+OWNER_RELEASE_172_DECISION_ID = "gaoge-1.7.2-2026-11-18"
+OWNER_RELEASE_172_EVIDENCE_PATH = "scripts/public-source-docs/owner-release-decision-1.7.2.md"
+OWNER_RELEASE_172_EVIDENCE_SHA256 = "2f306647796e027dc745d8fbbf1f1ebeea11085a4b4259ec90f40b78b089ed25"
+OWNER_RELEASE_172_SCOPE_COUNT = 50
+
+
+def owner_release_record(version):
+    if version == OWNER_RELEASE_VERSION:
+        return {"decisionId": OWNER_RELEASE_DECISION_ID, "version": OWNER_RELEASE_VERSION,
+                "evidencePath": OWNER_RELEASE_EVIDENCE_PATH, "evidenceSha256": OWNER_RELEASE_EVIDENCE_SHA256,
+                "scopeCount": OWNER_RELEASE_SCOPE_COUNT, "disclosureField": "acknowledgesUnverifiedRights"}
+    if version == "1.7.2":
+        return {"decisionId": OWNER_RELEASE_172_DECISION_ID, "version": "1.7.2",
+                "evidencePath": OWNER_RELEASE_172_EVIDENCE_PATH, "evidenceSha256": OWNER_RELEASE_172_EVIDENCE_SHA256,
+                "scopeCount": OWNER_RELEASE_172_SCOPE_COUNT, "disclosureField": "retainsUnverifiedDisclosures"}
+    return None
+
+
+def owner_release_scope(paths, version=OWNER_RELEASE_VERSION):
+    record = owner_release_record(version)
+    if record is None:
+        return {}, ["Owner release decision does not apply to this release version"]
+    data = paths.get(record["evidencePath"])
+    if data is None or sha(data) != record["evidenceSha256"]:
         return {}, ["Owner release decision evidence missing or changed"]
     blocks = re.findall(r"```json\s*\n(.*?)\n```", text(data) or "", re.S)
     try:
@@ -87,15 +110,19 @@ def owner_release_scope(paths):
     except json.JSONDecodeError:
         scope = {}
     items = scope.get("items", [])
-    if (scope.get("decisionId") != OWNER_RELEASE_DECISION_ID or scope.get("version") != OWNER_RELEASE_VERSION
-            or not isinstance(items, list) or len(items) != OWNER_RELEASE_SCOPE_COUNT
+    if (set(scope) != {"decisionId", "version", "items"}
+            or scope.get("decisionId") != record["decisionId"] or scope.get("version") != record["version"]
+            or not isinstance(items, list) or len(items) != record["scopeCount"]
             or any(not isinstance(i, dict) or not isinstance(i.get("path"), str) for i in items)
-            or len({i["path"] for i in items}) != OWNER_RELEASE_SCOPE_COUNT):
+            or len({i["path"] for i in items}) != record["scopeCount"]):
         return {}, ["Owner release decision scope is invalid"]
     return {i["path"]: i for i in items}, []
 
 
 def owner_release_decision_issues(path, item, paths, version, scope):
+    record = owner_release_record(version)
+    if record is None:
+        return ["Owner release decision does not apply to this release version"]
     issues = []
     original = scope.get(path)
     if original is None:
@@ -103,15 +130,13 @@ def owner_release_decision_issues(path, item, paths, version, scope):
     if {k: v for k, v in item.items() if k != "releaseDecision"} != original:
         issues.append("Owner release decision must preserve the original unresolved audit fields")
     actual = sha(paths[path])
-    expected = {"type": "owner-directed-publication", "decisionId": OWNER_RELEASE_DECISION_ID,
-                "version": OWNER_RELEASE_VERSION, "sha256": actual,
-                "evidence": [{"path": OWNER_RELEASE_EVIDENCE_PATH, "sha256": OWNER_RELEASE_EVIDENCE_SHA256}],
-                "acknowledgesUnverifiedRights": True}
-    if item.get("releaseDecision") != expected or item.get("releaseDecision", {}).get("acknowledgesUnverifiedRights") is not True:
+    expected = {"type": "owner-directed-publication", "decisionId": record["decisionId"],
+                "version": record["version"], "sha256": actual,
+                "evidence": [{"path": record["evidencePath"], "sha256": record["evidenceSha256"]}],
+                record["disclosureField"]: True}
+    if item.get("releaseDecision") != expected:
         issues.append("Owner release decision fields, version, asset hash or evidence binding are invalid")
-    if version != OWNER_RELEASE_VERSION:
-        issues.append("Owner release decision does not apply to this release version")
-    if item.get("sha256") != actual:
+    if item.get("sha256") != actual or original.get("sha256") != actual:
         issues.append("Owner release decision asset hash changed")
     if any(e not in paths for e in original.get("evidence", [])):
         issues.append("Original provenance evidence must remain in the snapshot")
@@ -362,7 +387,9 @@ def inspect(paths, invalid):
         if item.get("path") in entries:
             findings.append({"path": item["path"], "status": "duplicate-audit", "reason": "duplicate audit path", "sha256": item.get("sha256", "")})
         entries[item.get("path")] = item
-    scope, scope_issues = owner_release_scope(paths) if OWNER_RELEASE_EVIDENCE_PATH in paths or any("releaseDecision" in item for item in entries.values()) else ({}, [])
+    record = owner_release_record(version)
+    has_release_evidence = any(name in paths for name in (OWNER_RELEASE_EVIDENCE_PATH, OWNER_RELEASE_172_EVIDENCE_PATH))
+    scope, scope_issues = owner_release_scope(paths, version) if has_release_evidence or any("releaseDecision" in item for item in entries.values()) else ({}, [])
     decision_active = any("releaseDecision" in item for item in entries.values()) or bool(set(scope) & set(paths))
     scope_preservation_issues = list(scope_issues) if decision_active else []
     if decision_active and scope:
@@ -407,7 +434,7 @@ def inspect(paths, invalid):
         if reasons:
             findings.append({"path": path, "status": status, "reason": "; ".join(reasons), "sha256": actual})
     check("rights_audit", [x["path"] for x in findings])
-    check("owner_release_disclosures_complete", [] if not decision_active or set(x["path"] for x in disclosures) == set(scope) and len(disclosures) == OWNER_RELEASE_SCOPE_COUNT else ["All owner-directed unresolved assets must be disclosed exactly once"])
+    check("owner_release_disclosures_complete", [] if not decision_active or set(x["path"] for x in disclosures) == set(scope) and record is not None and len(disclosures) == record["scopeCount"] else ["All owner-directed unresolved assets must be disclosed exactly once"])
     return version, checks, findings, disclosures
 
 

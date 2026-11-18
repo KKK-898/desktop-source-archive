@@ -464,6 +464,17 @@ foreach ($command in $commands) {
   assert.ok(workflow.offset < confirm.offset)
   assert.ok(confirm.offset < treeChecks[1].offset)
   assert.ok(treeChecks[1].offset < publish.offset)
+  const privacy = single('Initialize-BuildRepoVisibility')
+  const deploymentSync = named('Invoke-Checked').filter(command => command.elements[1] === 'node'
+    && command.elements.includes('sync') && command.elements.some(part => part.includes('deployment-config.mjs')))
+  const repoVariables = named('Invoke-Checked').filter(command => command.elements.slice(1, 4).join(' ') === 'gh variable set')
+  assert.equal(deploymentSync.length, 1, 'the nine deployment fields must use the guarded sync')
+  assert.deepEqual(repoVariables.map(command => command.elements[4]).sort(),
+    ['GAOGE_UPDATE_BASE_URL', 'GAOGE_UPDATE_MINIMUM_VERSION', 'VITE_GAOGE_BOOTSTRAP_CONFIG_URLS'])
+  assert.ok(source.offset < privacy.offset && privacy.offset < buildExport.offset)
+  for (const command of [...deploymentSync, ...repoVariables]) {
+    assert.ok(privacy.offset < command.offset, 'private build visibility must be confirmed before transmitting Actions variables')
+  }
   const gitMutations = result.top.filter(command => command.name === 'Invoke-Checked'
     && command.elements[1] === 'git' && ['tag', 'push', 'add', 'commit'].includes(command.elements[2]))
   assert.ok(gitMutations.some(command => command.elements[2] === 'tag'))

@@ -9,6 +9,8 @@ const RUNTIME_SCRIPT: &str = include_str!("codex_api_mode_runtime.js");
 const PENDING_WARNING: &str = "纯 API 编码模式正在验证，完成前请勿切换到 Work。";
 const LOCAL_PROJECTS_PENDING_WARNING: &str =
     "纯 API 的本地项目目录与成员尚未恢复完成，正在重试，尚未确认成功。";
+const LOCAL_PROJECTS_SCOPE_WARNING: &str =
+    "当前 Codex 的本地项目存储契约尚未验证，本次未改动项目分组。";
 const STATUS_MAX_AGE: Duration = Duration::from_secs(15);
 
 struct RecordedStatus {
@@ -61,6 +63,8 @@ pub fn record(value: &Value, revision: u64) {
     let version = value.get("version").and_then(Value::as_u64).unwrap_or(0);
     let raw_error = value.get("error").and_then(Value::as_str).unwrap_or("");
     let malformed_error = value.get("error").is_some_and(|value| !value.is_string());
+    let projects = &value["localProjects"];
+    let projects_not_ready = projects["ready"].as_bool() == Some(false);
     let reason = if raw_error.starts_with("Unsupported Codex API mode contract:")
         || raw_error.starts_with("Codex mode asset unavailable:")
         || (version != 0 && version != runtime_version())
@@ -75,6 +79,16 @@ pub fn record(value: &Value, revision: u64) {
             Some("awaiting-native-auth") | Some("not-api-login") => "awaiting-native-auth",
             Some("awaiting-native-policy") => "awaiting-native-policy",
             Some("awaiting-native-onboarding-state") => "awaiting-native-onboarding-state",
+            Some("awaiting-native-local-projects")
+                if projects_not_ready
+                    && projects["reason"] == "unverified-native-project-scope" =>
+            {
+                "unsupported-local-project-scope"
+            }
+            // The cached status retains only the public reason and the ready bit.
+            Some("unsupported-local-project-scope") if projects_not_ready => {
+                "unsupported-local-project-scope"
+            }
             Some("awaiting-native-local-projects") => "awaiting-native-local-projects",
             Some("normalizing-selection") => "normalizing-selection",
             Some("verification-failed") => "verification-failed",
@@ -179,6 +193,8 @@ pub fn status(required: bool, revision: u64) -> Value {
         json!([])
     } else if !error.is_empty() {
         json!([error])
+    } else if recorded.value["reason"] == "unsupported-local-project-scope" {
+        json!([LOCAL_PROJECTS_SCOPE_WARNING])
     } else if recorded.value["reason"] == "awaiting-native-local-projects" {
         json!([LOCAL_PROJECTS_PENDING_WARNING])
     } else {
@@ -440,6 +456,52 @@ mod tests {
                 assert!(!recorded.to_string().contains("private-"));
                 record(&recorded, 79);
                 assert_eq!(status(true, 79), recorded);
+            }
+        });
+    }
+
+    #[test]
+    fn verified_scope_limitation_has_a_static_warning_and_survives_sanitization() {
+        with_status_test(|| {
+            let mut raw = verified_runtime();
+            raw["reason"] = json!("awaiting-native-local-projects");
+            raw["localProjects"] = json!({"ready":false, "reason":"unverified-native-project-scope",
+                "scope":"private-owner", "error":"private-path"});
+            record(&raw, 31);
+            let public = status(true, 31);
+            assert_eq!(public["reason"], "unsupported-local-project-scope");
+            assert_eq!(public["warnings"], json!([LOCAL_PROJECTS_SCOPE_WARNING]));
+            assert_eq!(public["localProjects"], json!({"ready":false}));
+            assert_eq!(public["ready"], false);
+            assert_eq!(public["verified"], false);
+            assert!(!public.to_string().contains("private-"));
+            record(&public, 31);
+            assert_eq!(status(true, 31), public);
+
+            for (reason, local, expected) in [
+                (
+                    "awaiting-native-local-projects",
+                    json!({"ready":false,"reason":"unknown-native-project-owner"}),
+                    "awaiting-native-local-projects",
+                ),
+                (
+                    "awaiting-native-local-projects",
+                    json!({"ready":"false","reason":"unverified-native-project-scope"}),
+                    "awaiting-native-local-projects",
+                ),
+                (
+                    "unsupported-local-project-scope",
+                    json!({"ready":true}),
+                    "awaiting-runtime",
+                ),
+            ] {
+                raw["reason"] = json!(reason);
+                raw["localProjects"] = local;
+                record(&raw, 31);
+                let result = status(true, 31);
+                assert_eq!(result["reason"], expected);
+                assert_eq!(result["verified"], false);
+                assert_ne!(result["warnings"], json!([LOCAL_PROJECTS_SCOPE_WARNING]));
             }
         });
     }

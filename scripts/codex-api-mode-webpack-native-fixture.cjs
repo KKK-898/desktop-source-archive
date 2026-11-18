@@ -1,7 +1,38 @@
 const assert = require('node:assert/strict')
+const { createHash } = require('node:crypto')
 const vm = require('node:vm')
 const asar = require('@electron/asar')
 const ts = require('typescript')
+
+// The 26.1111 renderer imports browser auth only for side effects at these two
+// desktop call sites. Do not load that implementation or simulate credentials.
+function reviewBrowserAuthImports(records, factorySources) {
+  const owners = []
+  for (const {node, tree} of records) {
+    const loader = node.parameters[2].name.getText(tree)
+    function visit(child) {
+      if (ts.isCallExpression(child) && ts.isIdentifier(child.expression) && child.expression.text === loader
+          && child.arguments.some(arg => ts.isStringLiteral(arg) && arg.text === 'Au4v')) {
+        let expression = child
+        while (ts.isBinaryExpression(expression.parent) && expression.parent.operatorToken.kind === ts.SyntaxKind.CommaToken) expression = expression.parent
+        assert.ok(child.arguments.length === 1 && ts.isExpressionStatement(expression.parent)
+          && expression.parent.parent === node.body, 'Browser auth import must be unused at module initialization')
+        owners.push(node.name.getText(tree))
+      }
+      ts.forEachChild(child, visit)
+    }
+    visit(node.body)
+  }
+  if (!owners.length) return false
+  assert.deepEqual(owners.sort(), ['CWeU', 'T8X0'], 'Unreviewed browser auth import sites')
+  // An unused import can still execute initialization. Pin the actual factory,
+  // not just its module ID, before substituting the desktop-only test boundary.
+  const sources = factorySources()
+  assert.equal(sources.length, 1, 'Expected one reviewed browser auth factory')
+  assert.equal(createHash('sha256').update(sources[0]).digest('hex'),
+    '2ef5557aa8e57ffc5792997871cfd601c91b8a2cd9957c86e6cb28a2cebffd19', 'Unreviewed browser auth initialization')
+  return true
+}
 
 // Read installed code, but execute only these reviewed leaf modules against
 // in-memory services. No application entry, real IPC, credentials or files run.
@@ -12,10 +43,10 @@ function nativeWebpackApiFixture(packagePath) {
   const renderer = files.filter(file => /^webview[\\/]assets[\\/]/.test(file) && file.endsWith('.js'))
   const modeFiles = renderer.filter(file => { const text=read(file); return text.includes('previousThreadDetailLevel:') && text.includes('authenticatedAccountId:') })
   assert.equal(modeFiles.length,1,'Expected installed native mode module chunk')
-  function parseModules(file) {
+  function parseModules(file, collect = (id, record) => modules.set(id, record)) {
     const tree=ts.createSourceFile(file,read(file),ts.ScriptTarget.Latest,true,ts.ScriptKind.JS)
     function visit(node) { if(ts.isMethodDeclaration(node)&&node.body&&node.parameters.length===3&&ts.isObjectLiteralExpression(node.parent)) {
-      modules.set(node.name.getText(tree).replace(/^"|"$/g,''),{source:node.getText(tree),node,tree,file})
+      collect(node.name.getText(tree).replace(/^"|"$/g,''),{source:node.getText(tree),node,tree,file})
     } ts.forEachChild(node,visit) } visit(tree)
   }
   parseModules(modeFiles[0])
@@ -31,6 +62,15 @@ function nativeWebpackApiFixture(packagePath) {
   const records=[setter,policy,auth,access,statsig,product,sidebar]
   const ids=records.map(record=>record.node.name.getText(record.tree).replace(/^"|"$/g,''))
   assert.deepEqual(ids,['qixt','r8WG','CWeU','eFn4','OMIV','T8X0','pasN'],'Unreviewed installed mode module closure requires review')
+  const browserAuthUnused = reviewBrowserAuthImports(records, () => {
+    const sources = []
+    for (const file of renderer) {
+      if (/(?:^|[,{])\s*"?Au4v"?\s*\(/.test(read(file))) {
+        parseModules(file, (id, record) => { if (id === 'Au4v') sources.push(record.source) })
+      }
+    }
+    return sources
+  })
   const controlFiles=renderer.filter(file=>read(file).includes('sidebarElectron.productMode.work.description.recommended'))
   const controlSources=[]
   for(const file of controlFiles){const tree=ts.createSourceFile(file,read(file),ts.ScriptTarget.Latest,true,ts.ScriptKind.JS);function visit(node){if(ts.isFunctionDeclaration(node)&&node.body){const source=node.getText(tree);if(source.includes('sidebarElectron.productMode.trigger')&&source.includes('sidebarElectron.productMode.work.description.recommended')&&source.includes('sidebarElectron.productMode.codex.description.developer'))controlSources.push(source)}ts.forEachChild(node,visit)}visit(tree)}
@@ -83,6 +123,7 @@ function nativeWebpackApiFixture(packagePath) {
       X1mr:{},qhRx:{},rvFo:{D:{ONE_MINUTE:60000}},LjYy:{x:{FREE:'free',GO:'go'}},eShZ:{},Ietk:{j8:descriptor('ready')},SPnB:{},
       gb5j:{on:()=>null,M9:descriptor(null),yt:descriptor(null),wx:descriptor(null)},Qg7S:{z:()=>false},cX6x:{wc:()=>null},
     }
+    if (browserAuthUnused) stubs.Au4v = new Proxy(Object.freeze({}), {get(){throw Error('Browser auth is unavailable in the desktop fixture')}})
     function requireNative(id){if(cache[id])return cache[id].exports;if(Object.hasOwn(stubs,id)){cache[id]={exports:stubs[id]};return stubs[id]}if(!methods[id])throw Error('Unreviewed native dependency '+id);const entry={exports:{}};cache[id]=entry;methods[id](entry,entry.exports,requireNative);return entry.exports}
     requireNative.d=(target,getters,constants)=>{for(const[key,get]of Object.entries(getters))Object.defineProperty(target,key,{enumerable:true,get});for(const[key,value]of Object.entries(constants||{}))Object.defineProperty(target,key,{enumerable:true,value})}
     requireNative.m=methods;requireNative.c=cache
@@ -96,4 +137,4 @@ function nativeWebpackApiFixture(packagePath) {
   }
   return {format:'webpack',packageVersion:JSON.parse(asar.extractFile(packagePath,'package.json').toString()).version,createHarness,settingsSources:methods,rendererSources:records.map(record=>record.source),mainFile}
 }
-module.exports={nativeWebpackApiFixture}
+module.exports={nativeWebpackApiFixture,reviewBrowserAuthImports}

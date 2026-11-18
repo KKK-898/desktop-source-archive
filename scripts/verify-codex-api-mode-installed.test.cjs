@@ -1,6 +1,20 @@
 const assert = require('node:assert/strict')
 const test = require('node:test')
 const { assertApiModePassed } = require('./verify-codex-api-mode-installed.cjs')
+
+test('API mode release failure distinguishes a test file from a named assertion', () => {
+  const stdout = ['not ok 1 - scripts\\codex-api-onboarding.test.cjs',
+    'not ok 2 - installed route restores local completion',
+    'not ok 3 - scripts/codex-api-project-state.test.cjs',
+    'not ok 4 - installed project owner is current', '# fail 4'].join('\n')
+  assert.throws(() => assertApiModePassed({status: 1, stdout}), error => {
+    assert.match(error.message, /2 file-level failure\(s\): codex-api-onboarding\.test\.cjs, codex-api-project-state\.test\.cjs/)
+    assert.match(error.message, /2 named test failure\(s\): installed route restores local completion; installed project owner is current/)
+    return true
+  })
+  assert.throws(() => assertApiModePassed({status: null, signal: 'SIGTERM'}), /SIGTERM/)
+})
+
 test('API mode release check requires actual renderer and backend tests without skips', () => {
   const stdout = 'ok 1 - installed native API Work fails before normalization\nok 2 - installed renderer bindings use native state\n# fail 0\n# skipped 0\n'
   assert.doesNotThrow(() => assertApiModePassed({ status: 0, stdout }))
@@ -28,6 +42,8 @@ test('API mode release check requires native evidence for the selected renderer 
     'installed webpack API mode captures native selector and portal events until account switch or disposal',
     'native direct welcome redirects home when shared completion is restored despite pending=true',
     'native first API onboarding is preserved and genuine completion still persists without a principal',
+    'installed native onboarding restores a verified API completion receipt after an empty host hydration',
+    'installed native onboarding keeps a fresh API identity on welcome without a receipt',
     'installed native project chain and final sidebar preserve projects and complete legacy memberships in pure API mode',
     'installed native project sidebar survives repeated API official API transitions without changing membership or account permissions',
     'installed native first-pass migration matches all Rust-restored local memberships beyond the pending queue',
@@ -40,6 +56,8 @@ test('API mode release check requires native evidence for the selected renderer 
     'native explicit assignment and projectless conflicts stay unverified and are not overwritten',
     'newer GET revisions cannot silently authorize overwriting a concurrent snapshot',
     'native owner change blocks hydration before any catalog write',
+    'installed native project guard checks the active owner before accessing project data',
+    'installed API project guard rejects legacy snapshots on the native shared store',
     'real native account switch closes old RPC before selecting another owner',
     'same API renderer stops on a different home',
     'full native message-port RPC restores catalog and membership without replacing service methods',
@@ -66,6 +84,22 @@ test('API mode release check requires native evidence for the selected renderer 
   ]
   reports.webpack = reports.webpack.replace('# fail 0', added.map((name, i) => `ok ${i + 4} - ${name}`).join('\n') + '\n# fail 0')
   assert.throws(() => assertApiModePassed({ status: 0, stdout: oldLeafReport }, 'webpack'), 'Leaf-only success no longer satisfies the release check')
+  const fs = require('node:fs'), path = require('node:path');
+  const legacy = new Set([...fs.readFileSync(path.join(__dirname, 'codex-api-project-state.test.cjs'), 'utf8').matchAll(/^run\('([^']+)'/gm)].map(match=>match[1]));
+  assert.equal(legacy.size,26,'all legacy positive restore assertions must remain');
+  const modern = [...fs.readFileSync(path.join(__dirname, 'codex-api-project-shared-state.test.cjs'), 'utf8').matchAll(/^run\('([^']+)'/gm)].map(match=>match[1]);
+  const modernReport=reports.webpack.split('\n').filter(line=>!legacy.has(line.replace(/^ok \d+ - /,''))).join('\n')
+    .replace('# fail 0',modern.map((name,i)=>'ok '+(200+i)+' - '+name).join('\n')+'\n# fail 0');
+  assert.doesNotThrow(()=>assertApiModePassed({status:0,stdout:modernReport},'webpack','content-owner'));
+  assert.throws(()=>assertApiModePassed({status:0,stdout:modernReport},'webpack','renderer-owner'));
+  assert.throws(()=>assertApiModePassed({status:0,stdout:reports.webpack},'webpack','content-owner'));
+  assert.throws(()=>assertApiModePassed({status:0,stdout:modernReport},'webpack','unreviewed'));
+  for(const name of modern){
+    const line=modernReport.split('\n').find(line=>line.endsWith(' - '+name));
+    for(const replacement of ['',line+' # SKIP missing',line+' # TODO future',line.replace(/^ok /,'not ok ')])
+      assert.throws(()=>assertApiModePassed({status:0,stdout:modernReport.replace(line,replacement)},'webpack','content-owner'));
+  }
+
   const obsoleteReport=reports.webpack.replace('native scoped API hydration preserves only its reviewed shared completion whitelist','native scoped API hydration loses existing shared completion and renders welcome')
   assert.throws(() => assertApiModePassed({status:0,stdout:obsoleteReport},'webpack'), /Required native API mode check did not run/, 'An obsolete behavior name must not satisfy the reviewed native contract')
   for (let i = 4; i < 4 + added.length; i++) {

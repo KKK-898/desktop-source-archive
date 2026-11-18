@@ -313,9 +313,33 @@ fn native_ownership_detection_is_conservative_for_future_versions() {
     assert!(!has_native_project_state(&json!({"local-projects":{}})));
     assert!(has_native_project_state(&json!({MIGRATIONS:null})));
     assert!(has_native_project_state(&json!({LEGACY_IDS:{}})));
+    assert!(has_native_project_state(&json!({CONTENT_OWNER:null})));
     assert!(has_native_project_state(
         &json!({MIGRATIONS:{"some-future-host":{"version":99}}})
     ));
+}
+
+#[test]
+fn valid_legacy_queue_is_not_replayed_after_content_owner_or_sqlite_migration() {
+    for evidence in ["content-owner", ".codex-global-state.sqlite"] {
+        let mut f = Fixture::new();
+        if evidence == "content-owner" {
+            f.state[CONTENT_OWNER] = json!("signed-out");
+            f.save();
+        } else {
+            fs::write(f.root.path().join(evidence), b"not a real DB").unwrap();
+        }
+        let source = f.root.path().join(".codex-global-state.json");
+        let original = fs::read(&source).unwrap();
+        let original_threads = fs::read(&f.database).unwrap();
+        let report = f.run().unwrap();
+        assert!(report.native_projects_owned && report.deferred);
+        assert_eq!(report.restored, 0);
+        assert!(report.backup_path.is_none());
+        assert_eq!(fs::read(&source).unwrap(), original);
+        assert_eq!(fs::read(&f.database).unwrap(), original_threads);
+        assert!(!f.root.path().join("backups").exists());
+    }
 }
 
 #[test]

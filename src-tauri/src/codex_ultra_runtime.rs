@@ -146,7 +146,9 @@ fn catalog_reasoning_efforts(catalog: &Value, routes: &[AggregateProviderRoute])
         let declared = ["supported_reasoning_levels", "supportedReasoningEfforts", "supported_reasoning_efforts"]
             .iter().any(|key| model.get(*key).is_some_and(Value::is_array));
         let non_reasoning = declared && efforts.iter().all(|effort| effort == "none");
-        if !non_reasoning && codex_model_supports_ultra_reasoning(&model_name) {
+        let override_ultra = model.as_object().and_then(|entry| desktop_model_support::entry_override(entry, "supportsUltra"));
+        if override_ultra == Some(false) { efforts.retain(|effort| effort != "ultra"); }
+        if !non_reasoning && override_ultra.unwrap_or_else(|| codex_model_supports_ultra_reasoning(&model_name)) {
             for effort in ["max", "ultra"] {
                 if !efforts.iter().any(|value| value == effort) { efforts.push(effort.into()); }
             }
@@ -179,7 +181,8 @@ pub(super) fn state() -> Value {
         return disabled_state(true, "catalog-unavailable");
     };
     let model_reasoning_efforts = catalog_reasoning_efforts(&catalog, &aggregate.routes);
-    if model_reasoning_efforts.is_empty() { return disabled_state(true, "model-unsupported"); }
+    let model_ultra_overrides = desktop_model_support::catalog_ultra_overrides(&catalog);
+    if model_reasoning_efforts.is_empty() && model_ultra_overrides.is_empty() { return disabled_state(true, "model-unsupported"); }
     // Include the actual config and catalog in the identity so a changed route,
     // setting, or capability cannot inherit a previous menu's successful check.
     let mut digest = Sha256::new();
@@ -196,6 +199,7 @@ pub(super) fn state() -> Value {
         "modelCatalogPath": catalog_path.to_string_lossy(),
         "managedCatalogPaths": [catalog_path.to_string_lossy()],
         "modelReasoningEfforts": model_reasoning_efforts,
+        "modelUltraOverrides": model_ultra_overrides,
         "platform": std::env::consts::OS,
         "scopeKey": format!("{:x}", digest.finalize()),
     })
@@ -513,6 +517,24 @@ mod tests {
         assert!(map["gaoge/openai/1/gpt-6-astra"].as_array().unwrap().contains(&json!("ultra")));
         assert!(map["gaoge/custom/openai/1/gpt-6-astra"].as_array().unwrap().contains(&json!("ultra")));
         assert!(!map.contains_key("gpt-6-astra"));
+    }
+
+    #[test]
+    fn ultra_runtime_remote_declarations_override_legacy_and_keep_false_for_revocation() {
+        let catalog = json!({"models":[
+            {"slug":"gpt-6.2-astra","gaogeModelCapabilities":{"supportsUltra":true},"supported_reasoning_levels":[{"effort":"high"}]},
+            {"slug":"gpt-6.2-sol","gaogeModelCapabilities":{"supportsUltra":true},"supported_reasoning_levels":[{"effort":"max"}]},
+            {"slug":"future-exact","gaogeModelCapabilities":{"supportsUltra":true},"supported_reasoning_levels":[{"effort":"max"}]},
+            {"slug":"gpt-6.1-sol","gaogeModelCapabilities":{"supportsUltra":false},"supportedReasoningEfforts":["high","ultra"]},
+            {"slug":"nonreasoning","gaogeModelCapabilities":{"supportsUltra":true},"supported_reasoning_levels":[]}
+        ]});
+        let map = catalog_reasoning_efforts(&catalog, &[]);
+        for id in ["gpt-6.2-astra", "gpt-6.2-sol", "future-exact"] {
+            assert!(map[id].as_array().unwrap().contains(&json!("ultra")));
+        }
+        assert!(!map.contains_key("gpt-6.1-sol"));
+        assert!(!map.contains_key("nonreasoning"));
+        assert_eq!(desktop_model_support::catalog_ultra_overrides(&catalog)["gpt-6.1-sol"], false);
     }
 
     #[test]

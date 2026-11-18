@@ -17,6 +17,22 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 const MIGRATIONS: &str = "app-server-projects-migration-by-host";
 const LEGACY_IDS: &str = "app-server-project-id-by-legacy-project-id-by-host";
+const CONTENT_OWNER: &str = "electron-renderer-content-owner";
+
+/// A current host may already have committed its global state to SQLite. Old
+/// JSON is not authoritative then. Do not open the DB or enumerate its owners.
+pub(crate) fn has_native_global_state_db(home: &Path) -> bool {
+    [".codex-global-state.sqlite", ".codex-global-state.sqlite-wal",
+        ".codex-global-state.sqlite-shm", ".codex-global-state.sqlite-journal"]
+        .iter().any(|name| match fs::symlink_metadata(home.join(name)) {
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => false,
+            _ => true,
+        })
+}
+
+pub(super) fn has_content_owner_state(state: &Value) -> bool {
+    state.get(CONTENT_OWNER).is_some()
+}
 
 #[derive(Debug, Default, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -46,6 +62,7 @@ pub(super) fn has_native_project_state(state: &Value) -> bool {
         // were removed by selectRendererOwner(null). Unknown shapes also
         // prohibit the retired cwd-based membership rewrite.
         || state.get("electron-account-renderer-state-v1").is_some()
+        || has_content_owner_state(state)
 }
 
 #[derive(Clone, Debug, Serialize)]
@@ -301,7 +318,7 @@ fn permitted_database_name(database: &Path) -> bool {
 
 fn source_unchanged(path: &Path, original: &[u8]) -> Result<(), String> {
     let current = fs::read(path).map_err(|error| format!("复核项目迁移来源失败：{error}"))?;
-    if current != original {
+    if current != original || path.parent().map_or(true, has_native_global_state_db) {
         return Err("项目迁移来源在同步期间已改变，原生项目归属事务已取消。".to_string());
     }
     Ok(())
@@ -393,6 +410,10 @@ fn sync_inner(
             "Codex 目录不是绝对路径，未猜测项目迁移身份。",
         ));
     }
+    if has_native_global_state_db(codex_home) {
+        return Ok(deferred(ProjectCompatReport { native_projects_owned: true, ..report },
+            "原生全局状态可能已迁移，旧文件不用于恢复项目归属。"));
+    }
     let source_path = codex_home.join(".codex-global-state.json");
     let original = match fs::read(&source_path) {
         Ok(bytes) => bytes,
@@ -407,6 +428,9 @@ fn sync_inner(
     };
     if !report.native_projects_owned {
         return Ok(report);
+    }
+    if has_content_owner_state(&state) {
+        return Ok(deferred(report, "当前原生项目未验证独立归属，未修改项目数据。"));
     }
     // Keep original/source_path bound to the complete native file for the
     // transaction's race checks, even when an older launch hid the exact

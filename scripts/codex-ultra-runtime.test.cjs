@@ -667,21 +667,107 @@ test('webpack discovery reads cached reviewed constructors without initializing 
 })
 
 
-test('webpack entry discovery rejects foreign, ambiguous and mismatched resources', async () => {
+test('webpack entry discovery selects only one structural runtime among bounded same-document entries', async () => {
   const h = harness({ version:'26.1029' })
   h.context.URL = URL
-  h.run('location={href:"file:///C:/Codex/webview/index.html",origin:"null"};document.scripts=[{type:"module",src:"file:///C:/Codex/webview/assets/348410.abc.js"}]')
-  assert.equal(h.run('codexUltraWebpackEntryUrl()'), 'file:///C:/Codex/webview/assets/348410.abc.js')
-  h.run('document.scripts.push({type:"module",src:"file:///C:/Codex/webview/assets/another.abc.js"})')
-  assert.equal(h.run('codexUltraWebpackEntryUrl()'), '')
-  h.run('document.scripts=[{type:"module",src:"file:///D:/Unrelated/assets/348410.abc.js"}]')
-  assert.equal(h.run('codexUltraWebpackEntryUrl()'), '')
-  h.run('document.scripts=[{type:"module",src:"file:///C:/Codex/webview/assets/348410.abc.js"}];codexAppAssetUrl=()=>"";loadCalls=0;loadCodexAppModule=()=>{loadCalls++;throw Error("must not import")};')
+  h.run('location={href:"app://-/index.html",origin:"null"};document.readyState="complete";loadedEntries=new Set();performance={getEntriesByName:url=>loadedEntries.has(url)?[{name:url,entryType:"resource",initiatorType:"script",responseEnd:1}]:[]};entrySources=new Map();fetch=async url=>({ok:true,text:async()=>entrySources.get(url)||"export const chunk=1;"});')
+  h.run('document.scripts=Array.from({length:5},(_,i)=>({type:"module",src:"app://-/assets/"+(100+i)+".abc.js"}));runtimeEntrySource="export { nativeRequire as __webpack_require__ }; chunk.__rspack_esm_ids;chunk.__webpack_modules__;";entrySources.set(document.scripts[4].src,runtimeEntrySource);loadedEntries.add(document.scripts[4].src)')
+  assert.equal(await h.run('codexUltraWebpackEntryUrl()'), 'app://-/assets/104.abc.js')
+  h.run('entrySources.set(document.scripts[1].src,runtimeEntrySource)')
+  await assert.rejects(h.run('codexUltraWebpackEntryUrl()'), /Ambiguous Codex Ultra runtime entries/)
+  h.run('document.scripts=[{type:"module",src:"file:///D:/Unrelated/assets/348410.abc.js"},{type:"module",src:"app://foreign/assets/348410.abc.js"}]')
+  assert.equal(await h.run('codexUltraWebpackEntryUrl()'), '')
+  h.run('document.scripts=Array.from({length:17},(_,i)=>({type:"module",src:"app://-/assets/"+i+".abc.js"}))')
+  await assert.rejects(h.run('codexUltraWebpackEntryUrl()'), /module entry count/)
+  h.run('document.scripts=[{type:"module",src:"app://-/assets/104.abc.js"}];document.readyState="loading"')
+  assert.equal(await h.run('codexUltraWebpackEntryUrl()'), '')
+  h.run('document.readyState="interactive"')
+  assert.equal(await h.run('codexUltraWebpackEntryUrl()'), '')
+  h.run('document.readyState="complete";loadedEntries.clear()')
+  assert.equal(await h.run('codexUltraWebpackEntryUrl()'), '')
+  h.run('loadedEntries.add(document.scripts[0].src);codexAppAssetUrl=()=>"";loadCalls=0;loadCodexAppModule=()=>{loadCalls++;throw Error("must not import")};')
   const runtime = await h.install()
   assert.equal(runtime.status().reason, 'unsupported-query')
   assert.equal(h.run('loadCalls'), 0)
   assert.equal(h.run('remoteGate'), false)
   runtime.dispose()
+})
+
+test('webpack entry discovery fails closed on unreadable, oversized, changing and timed-out entries', async () => {
+  const h = harness({ version:'26.1029' })
+  h.context.URL = URL
+  h.run('location={href:"app://-/index.html"};document.readyState="complete";document.scripts=[{type:"module",src:"app://-/assets/348410.abc.js"}];fetch=async()=>({ok:false})')
+  await assert.rejects(h.run('codexUltraWebpackEntryUrl()'), /source is unavailable/)
+  h.run('fetch=async()=>({ok:true,headers:{get:()=>String(25*1024*1024)},text:async()=>{throw Error("must not read oversized body")}})')
+  await assert.rejects(h.run('codexUltraWebpackEntryUrl()'), /source size/)
+  h.run('fetch=async()=>({ok:true,text:async()=>{document.scripts=[];return "export { r as __webpack_require__ };c.__rspack_esm_ids;c.__webpack_modules__;"}})')
+  await assert.rejects(h.run('codexUltraWebpackEntryUrl()'), /entries changed/)
+  h.run('document.scripts=[{type:"module",src:"app://-/assets/348410.abc.js"}];fetch=async()=>new Promise(()=>{})')
+  await assert.rejects(h.run('codexUltraWebpackEntryUrl({assetTimeoutMs:10})'), /discovery timed out/)
+})
+
+test('webpack discovery never imports unloaded tags, fetch-only evidence, cancelled or replaced entries', async () => {
+  const h = harness({ version:'26.1029' })
+  h.context.URL = URL
+  h.run('location={href:"app://-/index.html"};document.readyState="complete";entry="app://-/assets/348410.abc.js";document.scripts=[{type:"module",src:entry}];loaded=false;initiator="script";performance={getEntriesByName:url=>loaded?[{name:url,entryType:"resource",initiatorType:initiator,responseEnd:1}]:[]};source="export { r as __webpack_require__ };c.__rspack_esm_ids;c.__webpack_modules__;";fetch=async()=>({ok:true,text:async()=>source});loadCalls=0;loadCodexAppModule=()=>{loadCalls++;throw Error("must not import")};codexAppAssetUrl=prefix=>prefix==="app-initial-"?"":entry;')
+  let runtime = await h.install()
+  assert.equal(runtime.status().reason, 'awaiting-page')
+  assert.equal(h.run('loadCalls'), 0)
+  runtime.dispose()
+  h.run('loaded=true;initiator="fetch"')
+  runtime = await h.install()
+  assert.equal(runtime.status().reason, 'awaiting-page')
+  assert.equal(h.run('loadCalls'), 0)
+  runtime.dispose()
+  h.run('initiator="script"')
+  runtime = await h.install()
+  assert.equal(runtime.status().error, 'must not import') // The loaded positive canary reaches only the stub, never native code.
+  assert.equal(h.run('loadCalls'), 1)
+  runtime.dispose()
+  h.run('loadCalls=0;initiator="script";fetch=()=>new Promise(resolve=>releaseFetch=resolve)')
+  const installing = h.install()
+  h.run('window.__gaogeCodexUltraRuntime.dispose();releaseFetch({ok:true,text:async()=>source})')
+  runtime = await installing
+  assert.equal(runtime.status().reason, 'disabled')
+  assert.equal(h.run('loadCalls'), 0)
+  h.run('fetch=async()=>({ok:true,text:async()=>source});codexAppAssetUrl=prefix=>{if(prefix==="app-initial-")return "";document.scripts=[{type:"module",src:"app://-/assets/replacement.abc.js"}];return entry;}')
+  runtime = await h.install()
+  assert.equal(runtime.status().reason, 'unsupported-query')
+  assert.match(runtime.status().error, /loaded entry evidence changed/)
+  assert.equal(h.run('loadCalls'), 0)
+  runtime.dispose()
+})
+
+test('webpack loader revalidates inside its final import microtask after a same-name entry replacement', async () => {
+  const h = harness({ version:'26.1029' })
+  h.context.URL = URL
+  h.run('location={href:"app://-/index.html"};document.readyState="complete";entry="app://-/assets/348410.abc.js";document.scripts=[{type:"module",src:entry}];performance={getEntriesByName:url=>[{name:url,entryType:"resource",initiatorType:"script",responseEnd:1}]};fetch=async()=>({ok:true,text:async()=>"export { r as __webpack_require__ };c.__rspack_esm_ids;c.__webpack_modules__;"});codexAppAssetUrl=prefix=>prefix==="app-initial-"?"":document.scripts[0].src;loaderCalls=0;nativeImports=0;loadCodexAppModule=(prefix,options)=>{loaderCalls++;if(options.expectedUrl!==entry||typeof options.validate!=="function")throw Error("missing final loader guard");return Promise.resolve().then(()=>{document.scripts=[{type:"module",src:"app://foreign/assets/348410.abc.js"}];return Promise.resolve().then(()=>{const current=codexAppAssetUrl(prefix);if(current!==options.expectedUrl||!options.validate(current))return null;nativeImports++;throw Error("must not import");});});};')
+  const runtime = await h.install()
+  assert.equal(h.run('loaderCalls'), 1)
+  assert.equal(h.run('nativeImports'), 0)
+  assert.equal(runtime.status().verified, false)
+  runtime.dispose()
+})
+
+test('26.1111 reviewed query preserves its exact config, specialty, team and request contract', () => {
+  const h = harness({ version:'26.1103' })
+  const callback = h.run('CODEX_ULTRA_RUNTIME_261111_QUERY_SHAPE')
+  const inspect = source => h.context.inspectCodexUltraRuntimeSource(source)
+  const contract = inspect(callback)
+  assert.equal(contract.configInQuery, true)
+  assert.equal(contract.responseFallback, undefined)
+  assert.equal(contract.callback, callback)
+  for (const [from, to] of [
+    ['.FIVE_MINUTES', '.ONE_MINUTE'],
+    ['enabled:!1', 'enabled:!0'],
+    ['model_provider', 'different_provider'],
+    ['modelSpecialty===u', 'modelSpecialty!==u'],
+    ['1186680773', 'other-gate'],
+    ['includeHidden:!0', 'includeHidden:!1'],
+  ]) {
+    assert.notEqual(callback.replace(from, to), callback)
+    assert.throws(() => inspect(callback.replace(from, to)), /model-query contract/)
+  }
 })
 
 test('26.1103 stale startup routes are not attached before a managed configuration arrives', async () => {
@@ -808,6 +894,7 @@ for (const { responseFallback, auth, aggregate } of installedUltraCases) test(ag
   const server = http.createServer((request, response) => {
     const name = new URL(request.url, 'http://127.0.0.1').pathname.slice(1)
     if (!name) { response.end('<!doctype html><div id="root"></div>'); return }
+    if (/^assets\/10000[1-4]\.chunk\.js$/.test(name)) { response.writeHead(200, { 'content-type': 'text/javascript' }); response.end('export const __rspack_esm_ids=[];export const __webpack_modules__={};'); return }
     const file = name.includes('..') || (!webpack && name.includes('/')) ? null : packaged.read(name)
     response.writeHead(file ? 200 : 404, { 'content-type': 'text/javascript' }); response.end(file || '')
   })
@@ -908,11 +995,15 @@ for (const { responseFallback, auth, aggregate } of installedUltraCases) test(ag
       return client.invalidateQueries()
     }
     if (webpack) {
-      const script = document.createElement('script'); script.type='module'; script.src='/' + appName; document.head.appendChild(script)
+      for (const name of ['100001.chunk.js','100002.chunk.js','100003.chunk.js','100004.chunk.js', appName.split('/').at(-1)]) {
+        const script = document.createElement('script'); script.type='module'; script.src='/assets/' + name; document.head.appendChild(script)
+      }
     }
     window.codexAppAssetUrl = prefix => webpack ? (prefix === appName.split('/').at(-1) ? new URL('/'+appName, location.href).href : '')
       : prefix === 'app-shared-' ? '/' + appName : '/native-model-query-fixture.js'
-    window.loadCodexAppModule = async prefix => {
+    window.loadCodexAppModule = async (prefix, options) => {
+      const address = new URL('/' + appName, location.href).href
+      if (options && (options.expectedUrl !== address || options.validate(address) !== true)) return null
       if (prefix !== (webpack ? appName.split('/').at(-1) : 'app-shared-')) throw new Error('Unexpected native module')
       return native
     }
@@ -1045,3 +1136,162 @@ test('aggregate declarations never enable empty or none-only native reasoning ca
   assert.equal(runtime.status().verified, false)
   runtime.dispose()
 })
+
+
+for (const version of ['26.1007', '26.1103']) for (const fallback of [false, true]) test(`${version} ${fallback ? 'fallback' : 'reviewed'} remote capabilities enable exact future IDs and revoke stale Ultra`, async () => {
+  const h = harness({ version });
+  h.run(`
+    const ids=['gpt-6.2-astra','gpt-6.2-sol','vendor/future-model','gpt-6.1-sol','other/future-model'];
+    models=ids.map((model,index)=>({model,hidden:false,isDefault:index===0,
+      supportedReasoningEfforts:(index===3?['high','max','ultra']:['high','max']).map(reasoningEffort=>({reasoningEffort}))}));
+    rawData={data:models};selectedModel=ids[0];
+    state.modelReasoningEfforts=Object.fromEntries(ids.slice(0,3).map(model=>[model,['high','max','ultra']]));
+    state.modelUltraOverrides={'gpt-6.2-astra':true,'gpt-6.2-sol':true,'vendor/future-model':true,'gpt-6.1-sol':false};
+    ${fallback ? "querySource=querySource.replace('.FIVE_MINUTES','.ONE_MINUTE');" : ''}
+    retain();
+  `);
+  let runtime = await h.install();
+  assert.equal(runtime.status().verified, true);
+  assert.deepEqual(Array.from(h.run('observer.result.models.map(model=>model.supportedReasoningEfforts.map(level=>level.reasoningEffort).join(","))')),
+    ['high,max,ultra','high,max,ultra','high,max,ultra','high,max','high,max']);
+  h.run(`state.modelReasoningEfforts={};state.modelUltraOverrides={'gpt-6.2-astra':false,'gpt-6.1-sol':false};state.scopeKey='revoked';`);
+  runtime = await h.install();
+  assert.equal(h.run('hasUltra()'), false);
+  assert.equal(h.run('remoteGate'), false);
+  runtime.dispose();
+});
+
+test('remote revocation removes Ultra across alternate native fields without granting nonreasoning support', () => {
+  const h=harness();
+  const output=h.run(`codexUltraModelResponse({data:[{model:'future',supportedReasoningEfforts:[{reasoningEffort:'ultra'}],
+    supported_reasoning_levels:[{effort:'ultra'}]},{model:'none',supportedReasoningEfforts:[{reasoningEffort:'none'}]}]},
+    {future:['ultra'],none:['max','ultra']},{future:false,none:true})`);
+  assert.deepEqual(Array.from(output.data[0].supportedReasoningEfforts), []);
+  assert.deepEqual(Array.from(output.data[0].supported_reasoning_levels), []);
+  assert.deepEqual(Array.from(output.data[1].supportedReasoningEfforts, value=>value.reasoningEffort), ['none']);
+});
+
+
+function remotePublicationHarness(version, fallback) {
+  const h = harness({ version });
+  h.run(`
+    modelEntry=(model,index)=>({model,hidden:false,isDefault:index===0,
+      supportedReasoningEfforts:['high','max'].map(reasoningEffort=>({reasoningEffort,description:reasoningEffort+' effort'}))});
+    models=['future-model','other-model'].map(modelEntry);rawData={data:models};
+    selectedModel='future-model';remoteGate=true;
+    state.modelReasoningEfforts={'future-model':['high','max','ultra']};
+    state.modelUltraOverrides={'future-model':true};
+    ${fallback ? "querySource=querySource.replace('.FIVE_MINUTES','.ONE_MINUTE');" : ''}
+    retain();
+    cacheQuery={queryKey:observer.options.queryKey,state:{data:rawData,dataUpdatedAt:42}};
+    root.queryClient.getQueryCache=()=>({getAll:()=>[cacheQuery]});
+    root.queryClient.setQueryData=(_key,data,options)=>{
+      cacheQuery.state={data,dataUpdatedAt:options.updatedAt};rawData=data;renderConsumers();return data;
+    };
+  `);
+  return h;
+}
+
+for (const version of ['26.1007', '26.1103']) for (const fallback of [false, true]) {
+  for (const refresh of [false, true]) for (const transition of ['disabled', 'default', 'changed']) {
+    test(`${version} ${fallback ? 'fallback' : 'reviewed'} queryFn provenance restores own Ultra on ${transition} ${refresh ? 'after' : 'without'} refresh`, async () => {
+      const h = remotePublicationHarness(version, fallback);
+      let runtime = await h.install();
+      assert.equal(h.run('hasUltra()'), true);
+      h.run(`rawData={data:['future-model','other-model'].map(modelEntry)};
+        rawData.data[0].displayName='new response';newOriginal=rawData;`);
+      h.context.response = await h.run('observer.options.queryFn({queryKey:observer.options.queryKey})');
+      h.run('root.queryClient.setQueryData(cacheQuery.queryKey,response,{updatedAt:60})');
+      if (refresh) await runtime.refresh();
+      h.run(`state={...state,enabled:${transition !== 'disabled'},
+        modelReasoningEfforts:${transition === 'changed' ? "{'other-model':['high','max','ultra']}" : '{}'},
+        modelUltraOverrides:${transition === 'changed' ? "{'other-model':true}" : '{}'}};`);
+      runtime = await h.install();
+      assert.equal(h.run('hasUltra()'), false);
+      assert.equal(h.run('cacheQuery.state.data.data[0].displayName'), 'new response');
+      assert.deepEqual(Array.from(h.run('cacheQuery.state.data.data[0].supportedReasoningEfforts.map(entry=>entry.reasoningEffort)')), ['high','max']);
+      assert.equal(h.run('cacheQuery.state.dataUpdatedAt'), 60);
+      assert.equal(h.run('remoteGate'), true);
+      if (transition !== 'changed') assert.equal(h.run('cacheQuery.state.data===newOriginal'), true);
+      else assert.equal(h.run('cacheQuery.state.data.data[1].supportedReasoningEfforts.some(entry=>entry.reasoningEffort==="ultra")'), true);
+      runtime.dispose();
+    });
+  }
+  test(`${version} ${fallback ? 'fallback' : 'reviewed'} queryFn provenance never retracts a genuinely newer native publication`, async () => {
+    const h = remotePublicationHarness(version, fallback);
+    const runtime = await h.install();
+    h.run(`rawData={data:['future-model','other-model'].map(modelEntry)};`);
+    h.context.response = await h.run('observer.options.queryFn({queryKey:observer.options.queryKey})');
+    h.run(`root.queryClient.setQueryData(cacheQuery.queryKey,response,{updatedAt:60});
+      nativePublication={data:[{...modelEntry('future-model',0),displayName:'native owns Ultra',
+        supportedReasoningEfforts:['high','max','ultra'].map(reasoningEffort=>({reasoningEffort,description:reasoningEffort+' effort'}))}]};
+      root.queryClient.setQueryData(cacheQuery.queryKey,nativePublication,{updatedAt:90});`);
+    runtime.dispose();
+    assert.equal(h.run('cacheQuery.state.data===nativePublication'), true);
+    assert.equal(h.run('cacheQuery.state.dataUpdatedAt'), 90);
+    assert.equal(h.run('hasUltra()'), true);
+  });
+}
+
+
+for (const version of ['26.1007', '26.1103']) for (const fallback of [false, true]) {
+  test(`${version} ${fallback ? 'fallback' : 'reviewed'} structurally copied queryFn publications lose only runtime-owned Ultra`, async () => {
+    const h = remotePublicationHarness(version, fallback);
+    h.run(`cacheQuery.setData=function(data,options){
+      const stored={...data,data:data.data.map(model=>({...model}))};
+      this.state={data:stored,dataUpdatedAt:options.updatedAt};rawData=stored;renderConsumers();return stored;
+    };nativeSetData=cacheQuery.setData;
+    root.queryClient.setQueryData=(_key,data,options)=>cacheQuery.setData(data,options);`);
+    let runtime = await h.install();
+    h.run(`rawData={data:['future-model','other-model'].map(modelEntry)};
+      rawData.data[0].displayName='fresh copied native data';newOriginal=rawData;`);
+    h.context.response = await h.run('observer.options.queryFn({queryKey:observer.options.queryKey})');
+    h.run('root.queryClient.setQueryData(cacheQuery.queryKey,response,{updatedAt:60})');
+    assert.equal(h.run('cacheQuery.state.data===response'), false);
+    h.run('state={...state,enabled:false,modelReasoningEfforts:{},modelUltraOverrides:{}}');
+    runtime = await h.install();
+    assert.equal(h.run('hasUltra()'), false);
+    assert.equal(h.run('cacheQuery.state.data.data[0].displayName'), 'fresh copied native data');
+    assert.equal(h.run('cacheQuery.state.dataUpdatedAt'), 60);
+    assert.equal(h.run('cacheQuery.setData===nativeSetData'), true);
+    assert.deepEqual(Array.from(h.run('newOriginal.data[0].supportedReasoningEfforts.map(level=>level.reasoningEffort)')), ['high','max']);
+    runtime.dispose();
+  });
+}
+
+
+test('owned publication hook preserves native identity reuse, method semantics and external replacements', async () => {
+  const h = remotePublicationHarness('26.1103', true);
+  h.run(`const prototype={setData(data,...args){
+    lastPublication={self:this,data,args};if(data?.throwPublication)throw expectedError;
+    const stored=this.state.data?.data?.[0]?.displayName==='native-identical' && data.data?.[0]?.displayName==='native-identical'
+      ? this.state.data : {...data};
+    this.state={data:stored,dataUpdatedAt:args[0].updatedAt};rawData=stored;renderConsumers();return stored;
+  }};Object.setPrototypeOf(cacheQuery,prototype);nativeSetData=cacheQuery.setData;
+  foreignQuery={queryKey:['models','remote'],state:{data:rawData,dataUpdatedAt:1},setData:nativeSetData};
+  root.queryClient.getQueryCache=()=>({getAll:()=>[cacheQuery,foreignQuery]});
+  root.queryClient.setQueryData=(_key,data,options)=>cacheQuery.setData(data,options);
+  expectedError=new Error('native publication error');`);
+  const runtime = await h.install();
+  assert.equal(h.run('foreignQuery.setData===nativeSetData'), true);
+  h.run(`rawData={data:[{...modelEntry('future-model',0),displayName:'native-identical'}]};newOriginal=rawData;`);
+  h.context.response = await h.run('observer.options.queryFn({queryKey:observer.options.queryKey})');
+  h.run(`published=cacheQuery.setData(response,{updatedAt:60},'unchanged-extra');
+    injected=cacheQuery.state.data;`);
+  assert.equal(h.run('published===cacheQuery.state.data'), true);
+  assert.equal(h.run('lastPublication.self===cacheQuery && lastPublication.data===response && lastPublication.args[1]==="unchanged-extra"'), true);
+  assert.equal(h.run(`(()=>{try{cacheQuery.setData({throwPublication:true});return false}catch(error){return error===expectedError}})()`), true);
+  h.run(`nativeIndependent=JSON.parse(JSON.stringify(response));
+    cacheQuery.setData(nativeIndependent,{updatedAt:90});`);
+  assert.equal(h.run('cacheQuery.state.data===injected'), true, 'native structural sharing intentionally reused identity');
+  runtime.dispose();
+  assert.equal(h.run('cacheQuery.state.data===injected'), true);
+  assert.equal(h.run('cacheQuery.state.dataUpdatedAt'), 90);
+  assert.equal(h.run('hasUltra()'), true, 'independent native Ultra is not runtime-owned');
+  assert.equal(h.run('cacheQuery.setData===nativeSetData'), true);
+  assert.equal(h.run('Object.hasOwn(cacheQuery,"setData")'), false, 'prototype descriptor restored');
+  const again = await h.install();
+  h.run('externalSetData=function(...args){return Reflect.apply(nativeSetData,this,args)};cacheQuery.setData=externalSetData');
+  again.dispose();
+  assert.equal(h.run('cacheQuery.setData===externalSetData'), true);
+});

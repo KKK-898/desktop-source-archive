@@ -21,6 +21,178 @@ fn save_request(snapshot: &Value) -> Value {
 }
 
 #[test]
+fn native_shared_project_grants_never_export_or_overwrite_the_legacy_cache() {
+    with_temp_user_home("project-unscoped-storage", |_| {
+        let home = codex_dir();
+        for evidence in ["content-owner", "ambiguous-owner", ".codex-global-state.sqlite",
+            ".codex-global-state.sqlite-wal", ".codex-global-state.sqlite-shm", ".codex-global-state.sqlite-journal"] {
+            empty_api_profile(&home);
+            let cache = home.join(".gaoge-api-local-projects.json");
+            let empty = runtime_payload(None).unwrap();
+            let saved = commit(&save_request(&empty)).unwrap()["apiLocalProjects"].clone();
+            let original = fs::read(&cache).unwrap();
+            let mut state = json!({"electron-account-renderer-state-v1":{"owner":null,"inactive":{}},
+                "electron-persisted-atom-state":{"gaoge:api-local-projects-hydrated-v1":{
+                    "scope":saved["scope"],"version":1,"revision":saved["revision"],"nonce":saved["checkpoint"]["nonce"]}},
+                "local-projects":{},"thread-project-assignments":{},"projectless-thread-ids":[]});
+            let path = home.join(".codex-global-state.json");
+            let db = evidence.starts_with('.').then(|| home.join(evidence));
+            if let Some(db) = &db {
+                // Not a real database: production must not open or modify it.
+                fs::write(db, b"synthetic store marker only").unwrap();
+                fs::write(&path, b"stale invalid JSON must not be read").unwrap();
+            } else {
+                state["electron-renderer-content-owner"] = if evidence == "content-owner" { json!("signed-out") } else { Value::Null };
+                write_json_pretty(&path, &state).unwrap();
+            }
+            let original_native = fs::read(&path).unwrap();
+            let original_auth = fs::read(home.join("auth.json")).unwrap();
+            for provided in [None, Some(&state)] {
+                let result = runtime_payload(provided).unwrap();
+                if evidence == "ambiguous-owner" {
+                    assert_eq!(result["unavailable"], true, "{evidence}");
+                    assert_eq!(result["reason"], "unverified-native-project-scope");
+                } else {
+                    assert_eq!(result["storage"], "native-shared", "{evidence}");
+                    assert!(result.get("unavailable").is_none());
+                    assert_eq!(result["runtimeRevision"], saved["runtimeRevision"]);
+                }
+                assert_eq!(result["scope"], saved["scope"]);
+                for key in ["globals", "memberships", "checkpoint", "revision"] {
+                    assert!(result.get(key).is_none(), "{evidence} leaked {key}");
+                }
+            }
+            for was_official in [false, true] { prepare_for_login(was_official).unwrap(); }
+            assert!(commit(&save_request(&saved)).is_err(), "{evidence}: no same-value CAS receipt");
+            assert!(codex_api_local_projects::finalize_native_state(&home, saved["scope"].as_str().unwrap()).unwrap().is_none());
+            assert_eq!(fs::read(&cache).unwrap(), original);
+            fs::remove_file(&cache).unwrap();
+            assert!(verified_native_project_source(&home, &state).unwrap().is_none());
+            for was_official in [false, true] { prepare_for_login(was_official).unwrap(); }
+            assert!(codex_api_local_projects::prepare_with_databases(&home, &state, &[]).unwrap().is_none());
+            assert!(codex_api_local_projects::capture_with_databases(&home, &state, &[]).unwrap().is_none());
+            assert!(codex_api_local_projects::read(&home).unwrap().is_none());
+            assert!(!cache.exists());
+            assert_eq!(fs::read(&path).unwrap(), original_native);
+            assert_eq!(fs::read(home.join("auth.json")).unwrap(), original_auth);
+            if let Some(db) = db {
+                assert_eq!(fs::read(&db).unwrap(), b"synthetic store marker only");
+                fs::remove_file(db).unwrap();
+            }
+        }
+    });
+}
+
+#[test]
+fn native_shared_grant_requires_current_pure_api_auth_and_has_no_cache_data() {
+    with_temp_user_home("project-native-shared-auth", |_| {
+        let home = codex_dir();
+        empty_api_profile(&home);
+        let auth = home.join("auth.json");
+        let api = fs::read(&auth).unwrap();
+        write_json_pretty(&home.join(".codex-global-state.json"), &json!({"electron-renderer-content-owner":"signed-out"})).unwrap();
+        let cache = home.join(".gaoge-api-local-projects.json");
+        fs::write(&cache, b"malformed obsolete cache must never be read").unwrap();
+        let granted = runtime_payload(None).unwrap();
+        assert_eq!(granted["storage"], "native-shared");
+        assert_eq!(granted["scope"], scope(&home).unwrap());
+        for key in ["globals", "memberships", "checkpoint", "revision"] { assert!(granted.get(key).is_none()); }
+        for contents in [None, Some(b"{}".to_vec()), Some(b"malformed".to_vec()),
+            Some(serde_json::to_vec(&official("fixture-user","fixture-account")).unwrap())] {
+            match contents { Some(contents) => fs::write(&auth,contents).unwrap(), None => fs::remove_file(&auth).unwrap() }
+            assert!(native_shared_grant(&home).unwrap().is_none());
+        }
+        fs::write(&auth,api).unwrap();
+        assert_eq!(runtime_payload(None).unwrap(),granted);
+        assert_eq!(fs::read(cache).unwrap(),b"malformed obsolete cache must never be read");
+    });
+}
+
+#[test]
+fn ordinary_project_bridge_requires_current_legacy_scope_before_cache_access() {
+    with_temp_user_home("project-bridge-legacy-scope", |_| {
+        let home = codex_dir();
+        empty_api_profile(&home);
+        let auth = home.join("auth.json");
+        let native = home.join(".codex-global-state.json");
+        let cache = home.join(".gaoge-api-local-projects.json");
+        let original_auth = fs::read(&auth).unwrap();
+        let initial = runtime_payload(None).unwrap();
+        let mut verified: Value = serde_json::from_slice(&fs::read(&native).unwrap()).unwrap();
+        let host = format!("local:{}", home.to_string_lossy());
+        verified["local-projects"] = json!({});
+        verified["app-server-project-id-by-legacy-project-id-by-host"] =
+            json!({(host): {"fixture-project": "fixture-project"}});
+        write_json_pretty(&native, &verified).unwrap();
+        let mut first = save_request(&initial);
+        first["globals"]["local-projects"]["fixture-project"] = json!({
+            "id":"fixture-project", "name":"Fixture", "rootPaths":[], "createdAt":1, "updatedAt":2
+        });
+        let saved = commit(&first).unwrap()["apiLocalProjects"].clone();
+        assert_eq!(saved["globals"]["local-projects"]["fixture-project"]["name"], "Fixture");
+        let mut changed = save_request(&saved);
+        changed["globals"] = initial["globals"].clone();
+
+        let bytes = |path: &Path| match fs::read(path) {
+            Ok(value) => Some(value),
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => None,
+            Err(error) => panic!("could not read fixture: {error}"),
+        };
+        let assert_denied = |case: &str| {
+            let files = [&auth, &native, &cache];
+            let before = files.map(|path| bytes(path));
+            prepare_for_login(false).unwrap();
+            // A snapshot passed by an earlier status read cannot grant this request access.
+            for hint in [None, Some(&verified)] {
+                let status = runtime_payload(hint).unwrap();
+                assert_eq!(status["unavailable"], true, "{case}");
+                assert_eq!(status["reason"], "unverified-native-project-scope", "{case}");
+                for field in ["globals", "memberships", "revision", "checkpoint"] {
+                    assert!(status.get(field).is_none(), "{case}: unexpected {field}");
+                }
+            }
+            assert!(commit(&first).is_err(), "{case}: identical save retry");
+            assert!(commit(&changed).is_err(), "{case}: changed save");
+            assert_eq!(files.map(|path| bytes(path)), before, "{case}: fixture changed");
+        };
+        for (case, contents) in [
+            ("missing native file", None),
+            ("empty native file", Some("")),
+            ("invalid JSON", Some("{")),
+            ("null", Some("null")),
+            ("array", Some("[]")),
+            ("no owner marker", Some(r#"{"local-projects":{}}"#)),
+            ("null envelope", Some(r#"{"electron-account-renderer-state-v1":null}"#)),
+            ("missing owner", Some(r#"{"electron-account-renderer-state-v1":{"inactive":{}}}"#)),
+            ("non-null owner", Some(r#"{"electron-account-renderer-state-v1":{"owner":"fixture","inactive":{}}}"#)),
+            ("missing inactive map", Some(r#"{"electron-account-renderer-state-v1":{"owner":null}}"#)),
+            ("bad inactive map", Some(r#"{"electron-account-renderer-state-v1":{"owner":null,"inactive":[]}}"#)),
+        ] {
+            match contents {
+                Some(contents) => fs::write(&native, contents).unwrap(),
+                None => fs::remove_file(&native).unwrap(),
+            }
+            assert_denied(case);
+        }
+        write_json_pretty(&native, &verified).unwrap();
+        fs::remove_file(&auth).unwrap();
+        assert_denied("missing API auth");
+        write_json_pretty(&auth, &official("fixture-user", "fixture-account")).unwrap();
+        assert_denied("not pure API auth");
+        fs::write(&auth, original_auth).unwrap();
+        assert_eq!(runtime_payload(None).unwrap(), saved);
+
+        let sidecar = home.join(".codex-global-state.sqlite-wal");
+        fs::write(&sidecar, b"fixture marker only").unwrap();
+        write_json_pretty(&native, &json!({"local-projects":{}})).unwrap();
+        fs::remove_file(sidecar).unwrap();
+        assert_denied("sidecar disappeared, still no legacy owner");
+        fs::remove_file(&cache).unwrap();
+        assert_denied("no owner, must not create a new cache");
+    });
+}
+
+#[test]
 fn project_bridge_saves_empty_api_state_and_accepts_only_identical_retries() {
     with_temp_user_home("api-project-bridge-cas", |_| {
         let home = codex_dir();

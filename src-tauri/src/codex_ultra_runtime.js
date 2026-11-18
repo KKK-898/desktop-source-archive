@@ -1,6 +1,6 @@
 // Local, reversible model-query adaptation using declared catalog capabilities.
 // Never changes an account-wide flag, application files, or desktop opt-in.
-var CODEX_ULTRA_RUNTIME_VERSION = 7;
+var CODEX_ULTRA_RUNTIME_VERSION = 9;
 var CODEX_ULTRA_RUNTIME_QUERY_SHAPE = '({additionalAvailableModels:e,authMethod:t,enabledReasoningEfforts:n,hasConfiguredModelCatalog:r,hostId:i,includeUltraReasoningEffort:a,isCustomModelProvider:o,limit:s,modelCatalogPath:c,modelProvider:l},{get:u,queryClient:d,scope:f})=>{let p=Pd?.daybreakPreferences!=null&&i===`local`&&t===`apikey`,m=p?zc(u,`api_key_daybreak_preference`)?.apiKeySession:void 0,h=m!=null&&u(dHe,i),g=yee(i,t,s,p?m??`unavailable`:void 0),_=n==null?u(GRi):new Set([...n,`persistent`]),v=u(BRi),y=a&&u(kc,`1186680773`);return{queryKey:[...g,...o?[l]:[],...c==null?[]:[c]],enabled:u(Ie).includes(i),refetchOnWindowFocus:!0,staleTime:Qg.FIVE_MINUTES,queryFn:({queryKey:e})=>{let t=d.getQueryData(e)==null?`interactive`:`background`;return o&&d.removeQueries({exact:!0,queryKey:g}),jg(f,i).sendRequest(`model/list`,{includeHidden:!0,cursor:null,limit:s},{priority:t})},select:({data:n})=>ARi({additionalAvailableModels:new Set(e),apiKeyDaybreakSupported:h,authMethod:t,availableModels:v.availableModels,defaultModel:v.defaultModel,enabledReasoningEfforts:_,hasConfiguredModelCatalog:r,includeUltraReasoningEffort:y,isCustomModelProvider:o,models:n,useHiddenModels:v.useHiddenModels})}}';
 // 26.1013 adds a team catalog and a cancellation signal. Keep its native query
 // identity/enablement intact; team consumers are never eligible for our hook.
@@ -19,6 +19,11 @@ var CODEX_ULTRA_RUNTIME_CONFIG_QUERY_SHAPE = "({additionalAvailableModels:e,auth
 
 // Alpha-equivalence permits build-specific minified binding names, but preserves
 // property names, literals, operators and the entire reviewed control flow.
+// 26.1111 preserves the reviewed reactive config/query/filter contract, but
+// minifier scope reuse differs. Keep its complete callback as a separate exact
+// contract instead of weakening identifier/control-flow validation globally.
+var CODEX_ULTRA_RUNTIME_261111_QUERY_SHAPE = "({additionalAvailableModels:e,authMethod:t,enabledReasoningEfforts:r,hostId:n,includeUltraReasoningEffort:i=!0,limit:o=100,specialty:u,teamCatalog:h},{get:x,queryClient:k,scope:I})=>{let{data:S}=x(y.I2,n,{enabled:!1}),j=null==S?null:(0,c.Y$)(S.config),A=(0,c.cc)(j),T=\"string\"==typeof j?.model_provider?j.model_provider:null,P=\"string\"==typeof j?.model_catalog_json?j.model_catalog_json:null,E=null!=h,N=\"loading\"===h?null:h,M=m.appServices?.daybreakPreferences!=null&&n===g.fI&&\"apikey\"===t,O=M?x(p.i)?.apiKeySession:void 0,F=null!=O&&x(f.dK,n),R=(0,_.o)(n,t,o,M?O??\"unavailable\":void 0),D=null==r?x(C.pN):new Set([...r,\"persistent\"]),L=x(w.t),z=i&&x(v.JW,\"1186680773\");return{queryKey:E?[\"models\",\"list\",n,\"team\",h]:[...R,...A?[T]:[],...null==P?[]:[P]],enabled:E?N?.accountId!=null&&null!=N.userId:x(d.Dj).includes(n),refetchOnWindowFocus:!0,staleTime:b.D.FIVE_MINUTES,queryFn:async({queryKey:e,signal:t})=>{let r=null==k.getQueryData(e)?\"interactive\":\"background\";return A&&k.removeQueries({exact:!0,queryKey:R}),(0,s.V)(I,n).sendRequest(\"model/list\",{includeHidden:!0,cursor:null,limit:o},{priority:r})},select:({data:r,isTeamCatalog:n=!1})=>({...(0,a.a)({additionalAvailableModels:new Set(e),apiKeyDaybreakSupported:F,authMethod:t,availableModels:L.availableModels,defaultModel:L.defaultModel,enabledReasoningEfforts:D,hasConfiguredModelCatalog:(0,l.bo)(j),includeUltraReasoningEffort:z,isCustomModelProvider:A,models:null==u?r:r.filter(e=>e.modelSpecialty===u),useHiddenModels:L.useHiddenModels}),isTeamCatalog:n})}}";
+
 function codexUltraCanonical(source) {
   const tokens = source.match(/`(?:\\.|[^`\\])*`|"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'|[A-Za-z_$][\w$]*|\?\.|\S/g) || [];
   const names = new Map();
@@ -61,7 +66,7 @@ function inspectCodexUltraRuntimeSource(source, allowResponseFallback = false) {
   }
   const reference = CODEX_ULTRA_RUNTIME_QUERY_SHAPE;
   const patched = reference.replace('a&&u(kc,`1186680773`)', 'a&&(u(kc,`1186680773`)||t===`apikey`&&o&&r)');
-  const matched = candidates.length === 1 && [reference, patched, CODEX_ULTRA_RUNTIME_TEAM_QUERY_SHAPE, CODEX_ULTRA_RUNTIME_SIGNAL_QUERY_SHAPE, CODEX_ULTRA_RUNTIME_WEBPACK_QUERY_SHAPE, CODEX_ULTRA_RUNTIME_CONFIG_QUERY_SHAPE].find(value =>
+  const matched = candidates.length === 1 && [reference, patched, CODEX_ULTRA_RUNTIME_TEAM_QUERY_SHAPE, CODEX_ULTRA_RUNTIME_SIGNAL_QUERY_SHAPE, CODEX_ULTRA_RUNTIME_WEBPACK_QUERY_SHAPE, CODEX_ULTRA_RUNTIME_CONFIG_QUERY_SHAPE, CODEX_ULTRA_RUNTIME_261111_QUERY_SHAPE].find(value =>
     codexUltraCanonical(value) === codexUltraCanonical(candidates[0]));
   if (!matched) {
     // A live native query may outlive the exact bundled callback contract. Only
@@ -77,7 +82,7 @@ function inspectCodexUltraRuntimeSource(source, allowResponseFallback = false) {
   }
   return {
     callback: candidates[0],
-    configInQuery: matched === CODEX_ULTRA_RUNTIME_CONFIG_QUERY_SHAPE,
+    configInQuery: [CODEX_ULTRA_RUNTIME_CONFIG_QUERY_SHAPE, CODEX_ULTRA_RUNTIME_261111_QUERY_SHAPE].includes(matched),
     select: codexUltraCanonical(matched.slice(matched.indexOf('select:') + 7, -2)),
     queryFn: codexUltraCanonical(matched.slice(matched.indexOf('queryFn:') + 8, matched.indexOf(',select:'))),
   };
@@ -198,20 +203,75 @@ function discoverCodexUltraQueryFactory(initial, shared, module) {
   return codexUltraExport(shared, module, querySignal);
 }
 
-// Resolve only a loaded same-origin module entry. Importing its cached namespace
-// never evaluates an uninitialized application chunk or invokes webpack require.
-function codexUltraWebpackEntryUrl() {
-  if (typeof document === 'undefined' || typeof location === 'undefined') return '';
-  const urls = Array.from(document.scripts || []).filter(script => script.type === 'module')
+// Inspect only same-document module entries, never imports or lazy chunks. A
+// newer native document may publish several Rspack chunks before its runtime.
+// All candidates must be read before selecting one; ambiguity stays fail-closed.
+function codexUltraWebpackEntryUrls() {
+  if (typeof document === 'undefined' || typeof location === 'undefined') return [];
+  if (document.readyState !== 'complete') return [];
+  const scripts = Array.from(document.scripts || []);
+  if (scripts.length > 128) throw new Error('Unsupported Codex Ultra document script count');
+  const base = new URL(location.href), directory = new URL('./assets/', base);
+  const urls = Array.from(new Set(scripts.filter(script => script.type === 'module')
     .map(script => script.src).filter(Boolean).filter(address => {
-      try { const url = new URL(address, location.href);
-        const directory = new URL('./assets/', location.href);
-        return url.origin === location.origin && url.pathname.startsWith(directory.pathname)
+      try { const url = new URL(address, base);
+        return url.protocol === base.protocol && url.host === base.host
+          && url.origin === base.origin && !url.username && !url.password && !url.search && !url.hash
+          && url.pathname.startsWith(directory.pathname)
           && !url.pathname.slice(directory.pathname.length).includes('/')
           && /\/assets\/[\w-]+\.[\w-]+\.js$/.test(url.pathname);
       } catch (_) { return false; }
-    });
-  return urls.length === 1 ? urls[0] : '';
+    })));
+  if (urls.length > 16) throw new Error('Unsupported Codex Ultra module entry count');
+  return urls;
+}
+
+function codexUltraIsWebpackRuntimeSource(source) {
+  return typeof source === 'string' && /\bas\s+__webpack_require__\b/.test(source)
+    && source.includes('.__rspack_esm_ids') && source.includes('.__webpack_modules__');
+}
+
+// A script tag alone is not evidence that its module was loaded. In
+// particular, our source-only fetch must never authorize importing a newly
+// inserted tag. Require the browser's completed script-resource record.
+function codexUltraWebpackEntryLoaded(url) {
+  if (typeof performance === 'undefined' || typeof performance.getEntriesByName !== 'function') return false;
+  return performance.getEntriesByName(url, 'resource').some(entry => entry.name === url
+    && entry.entryType === 'resource' && entry.initiatorType === 'script'
+    && Number.isFinite(entry.responseEnd) && entry.responseEnd > 0);
+}
+
+async function codexUltraWebpackEntryUrl(options = {}) {
+  const urls = codexUltraWebpackEntryUrls();
+  if (!urls.length) return '';
+  const controller = typeof AbortController === 'function' ? new AbortController() : null;
+  let timeout, bytes = 0;
+  try {
+    return await Promise.race([
+      (async () => {
+        const matches = [];
+        for (const url of urls) {
+          if (controller?.signal.aborted) throw new Error('Codex Ultra entry discovery cancelled');
+          const response = await fetch(url, { cache: 'force-cache', ...(controller ? { signal: controller.signal } : {}) });
+          if (!response.ok) throw new Error('Codex Ultra entry source is unavailable');
+          const length = Number(response.headers?.get?.('content-length'));
+          if (Number.isFinite(length) && length > 24 * 1024 * 1024) throw new Error('Unsupported Codex Ultra entry source size');
+          const source = await response.text();
+          if (controller?.signal.aborted) throw new Error('Codex Ultra entry discovery cancelled');
+          bytes += source.length;
+          if (bytes > 24 * 1024 * 1024) throw new Error('Unsupported Codex Ultra entry source size');
+          if (codexUltraIsWebpackRuntimeSource(source)) matches.push(url);
+        }
+        if (matches.length > 1) throw new Error('Ambiguous Codex Ultra runtime entries');
+        if (JSON.stringify(urls) !== JSON.stringify(codexUltraWebpackEntryUrls())) throw new Error('Codex Ultra document entries changed');
+        return matches.length === 1 && codexUltraWebpackEntryLoaded(matches[0]) ? matches[0] : '';
+      })(),
+      new Promise((_, reject) => { timeout = setTimeout(() => {
+        controller?.abort();
+        reject(new Error('Codex Ultra entry discovery timed out'));
+      }, options.assetTimeoutMs ?? 3000); }),
+    ]);
+  } finally { clearTimeout(timeout); }
 }
 
 function discoverCodexUltraWebpackRuntime(module, allowResponseFallback = false) {
@@ -298,7 +358,7 @@ function codexUltraEffortEntries(value) {
   });
 }
 
-function codexUltraModelEfforts(model, declarations) {
+function codexUltraModelEfforts(model, declarations, overrides) {
   const nativeLists = ['supportedReasoningEfforts', 'supported_reasoning_levels', 'supported_reasoning_efforts']
     .flatMap(key => Array.isArray(model?.[key]) ? [model[key]] : []);
   const native = codexUltraEffortEntries(nativeLists.flat());
@@ -308,10 +368,12 @@ function codexUltraModelEfforts(model, declarations) {
   if (nativeLists.length && native.every(entry => entry.reasoningEffort === 'none')) return native;
   const declared = typeof model?.model === 'string' && declarations && Object.hasOwn(declarations, model.model)
     ? declarations[model.model] : [];
-  return codexUltraEffortEntries([...native, ...(Array.isArray(declared) ? declared : [])]);
+  const efforts = codexUltraEffortEntries([...native, ...(Array.isArray(declared) ? declared : [])]);
+  return typeof model?.model === 'string' && overrides && Object.hasOwn(overrides, model.model)
+    && overrides[model.model] === false ? efforts.filter(entry => entry.reasoningEffort !== 'ultra') : efforts;
 }
 
-function codexUltraModelResponse(input, declarations) {
+function codexUltraModelResponse(input, declarations, overrides) {
   if (!input || typeof input !== 'object') return input;
   const result = { ...input };
   let changed = false;
@@ -319,10 +381,21 @@ function codexUltraModelResponse(input, declarations) {
     if (!Array.isArray(input[key])) continue;
     result[key] = input[key].map(model => {
       if (typeof model?.model !== 'string') return model;
-      const efforts = codexUltraModelEfforts(model, declarations);
-      if (!efforts.length || JSON.stringify(efforts) === JSON.stringify(model.supportedReasoningEfforts)) return model;
+      const efforts = codexUltraModelEfforts(model, declarations, overrides);
+      const denied = overrides && Object.hasOwn(overrides, model.model) && overrides[model.model] === false;
+      const staleAlias = denied && ['supported_reasoning_levels', 'supported_reasoning_efforts'].some(field =>
+        codexUltraEffortEntries(model[field]).some(entry => entry.reasoningEffort === 'ultra'));
+      if ((!efforts.length && !denied)
+          || (!staleAlias && JSON.stringify(efforts) === JSON.stringify(model.supportedReasoningEfforts))) return model;
       changed = true;
-      return { ...model, supportedReasoningEfforts: efforts };
+      const next = { ...model, supportedReasoningEfforts: efforts };
+      if (overrides && Object.hasOwn(overrides, model.model) && overrides[model.model] === false) {
+        for (const field of ['supported_reasoning_levels', 'supported_reasoning_efforts']) {
+          if (Array.isArray(model[field])) next[field] = model[field].filter(entry =>
+            (typeof entry === 'string' ? entry : entry?.reasoningEffort ?? entry?.reasoning_effort ?? entry?.effort) !== 'ultra');
+        }
+      }
+      return next;
     });
   }
   return changed ? result : input;
@@ -339,9 +412,11 @@ async function installCodexUltraRuntime(options) {
     .map(catalogPath).filter(Boolean)));
   const declarations = state.modelReasoningEfforts && typeof state.modelReasoningEfforts === 'object'
     && !Array.isArray(state.modelReasoningEfforts) ? state.modelReasoningEfforts : {};
+  const overrides = state.modelUltraOverrides && typeof state.modelUltraOverrides === 'object'
+    && !Array.isArray(state.modelUltraOverrides) ? state.modelUltraOverrides : {};
   const allowResponseFallback = Object.values(declarations).some(value => codexUltraEffortEntries(value)
-    .some(entry => entry.reasoningEffort === 'ultra'));
-  const routeKey = JSON.stringify([state.enabled === true, state.provider, catalogs, scopeKey, windows, declarations]);
+    .some(entry => entry.reasoningEffort === 'ultra')) || Object.values(overrides).some(value => value === false);
+  const routeKey = JSON.stringify([state.enabled === true, state.provider, catalogs, scopeKey, windows, declarations, overrides]);
   const previous = window.__gaogeCodexUltraRuntime;
   if (previous?.version === CODEX_ULTRA_RUNTIME_VERSION && previous.routeKey === routeKey && !previous.disposed) {
     await previous.refresh();
@@ -352,8 +427,18 @@ async function installCodexUltraRuntime(options) {
   const changes = new Map();
   const records = new Set();
   const cacheChanges = new Map();
+  // queryFn publications can replace a cache entry after updateCaches ran.
+  // Remember only responses this runtime transformed, never arbitrary native data.
+  const responseSources = new WeakMap();
+  const publishers = new Map();
+  const responseSource = value => responseSources.get(value) || value;
+  const normalizeResponse = input => {
+    const output = codexUltraModelResponse(input, declarations, overrides);
+    if (output !== input) responseSources.set(output, responseSource(input));
+    return output;
+  };
   const wrappedMembers = new WeakMap();
-  let disposed = false, timer, pending = null, contract = null, createQuery = null, assetUrl = '';
+  let disposed = false, timer, pending = null, contract = null, createQuery = null, assetUrl = '', entrySignature = '';
   let reason = enabled ? 'awaiting-page' : 'disabled', error = '', generation = 0;
   const isManaged = args => args?.hostId === 'local' && ['apikey', 'chatgpt'].includes(args.authMethod)
     && args.teamCatalog == null
@@ -436,11 +521,11 @@ async function installCodexUltraRuntime(options) {
     record.error = '';
     return { ...original, queryFn: async (...request) => {
       const input = await Reflect.apply(original.queryFn, original, request);
-      return disposed || !record.managed || !isManaged(args) ? input : codexUltraModelResponse(input, declarations);
+      return disposed || !record.managed || !isManaged(args) ? input : normalizeResponse(input);
     }, select: input => {
       if (disposed || !isManaged(args)) return original.select(input);
       try {
-        const normalized = codexUltraModelResponse(input, declarations);
+        const normalized = codexUltraModelResponse(input, declarations, overrides);
         let result = local.select(normalized);
         const nativeModels = Array.isArray(normalized?.data) ? normalized.data : normalized?.models;
         if (!Array.isArray(nativeModels) || !Array.isArray(result?.models)) throw new Error('Unsupported Codex model-list response');
@@ -449,11 +534,11 @@ async function installCodexUltraRuntime(options) {
           const replacements = new Map();
           const models = result.models.map(model => {
             const capability = capabilities.get(model.model);
-            if (!codexUltraModelEfforts(capability, declarations).some(entry => entry.reasoningEffort === 'ultra')
+            if (!codexUltraModelEfforts(capability, declarations, overrides).some(entry => entry.reasoningEffort === 'ultra')
                 || model.disabled === true || model.locked === true
                 || model.supportedReasoningEfforts?.some(entry => entry.reasoningEffort === 'ultra')) return model;
             const updated = { ...model, supportedReasoningEfforts: [...(model.supportedReasoningEfforts || []),
-              codexUltraModelEfforts(capability, declarations).find(entry => entry.reasoningEffort === 'ultra')] };
+              codexUltraModelEfforts(capability, declarations, overrides).find(entry => entry.reasoningEffort === 'ultra')] };
             replacements.set(model, updated);
             return updated;
           });
@@ -553,7 +638,67 @@ async function installCodexUltraRuntime(options) {
       }
     }
   };
+  const trackPublisher = (query, client, record) => {
+    if (typeof query.setData !== 'function' || publishers.has(query)) return;
+    const original = query.setData;
+    const descriptor = Object.getOwnPropertyDescriptor(query, 'setData');
+    const key = JSON.stringify(record.queryKey);
+    let revision = 0;
+    const publication = { original, descriptor, wrapped: null };
+    function wrapped(input, ...args) {
+      if (disposed || publishers.get(query) !== publication || this !== query
+          || JSON.stringify(query.queryKey) !== key || !record.managed || !isManaged(record.args)) {
+        return Reflect.apply(original, this, [input, ...args]);
+      }
+      const currentRevision = ++revision;
+      const source = responseSources.get(input);
+      const stored = Reflect.apply(original, this, [input, ...args]);
+      // Native structural sharing can replace the response root. Bind ownership
+      // to the actual publication, but never reclaim a nested newer response.
+      if (revision === currentRevision) {
+        const published = query.state?.data;
+        if (source && published && typeof published === 'object') {
+          responseSources.set(published, source);
+          cacheChanges.set(query, { client, key: query.queryKey,
+            original: source, patched: published, updatedAt: query.state?.dataUpdatedAt });
+        } else {
+          // A genuine native publication owns its data even if structural
+          // sharing reuses the exact previous injected object identity.
+          if (published && typeof published === 'object') responseSources.delete(published);
+          cacheChanges.delete(query);
+        }
+      }
+      return stored;
+    }
+    publication.wrapped = wrapped;
+    Object.defineProperty(query, 'setData', { configurable: true, writable: true, value: wrapped });
+    publishers.set(query, publication);
+  };
+  const restorePublishers = () => {
+    for (const [query, publication] of publishers) {
+      if (query.setData !== publication.wrapped) continue;
+      if (publication.descriptor) Object.defineProperty(query, 'setData', publication.descriptor);
+      else delete query.setData;
+    }
+    publishers.clear();
+  };
   const restoreCache = () => {
+    // A queryFn may have published since our last refresh. Restrict discovery
+    // to this runtime's exact managed queries and transformed object identities.
+    for (const record of records) {
+      if (!record.managed || !record.queryKey) continue;
+      const client = record.root.queryClient;
+      if (typeof client?.getQueryCache !== 'function' || typeof client.setQueryData !== 'function') continue;
+      const queries = client.getQueryCache()?.getAll?.();
+      if (!Array.isArray(queries)) continue;
+      for (const query of queries) {
+        if (JSON.stringify(query.queryKey) !== JSON.stringify(record.queryKey)) continue;
+        const patched = query.state?.data;
+        const original = responseSources.get(patched);
+        if (original) cacheChanges.set(query, { client, key: query.queryKey,
+          original, patched, updatedAt: query.state?.dataUpdatedAt });
+      }
+    }
     for (const [query, change] of cacheChanges) {
       // Do not overwrite a newer native/server publication or another plugin.
       if (query.state?.data === change.patched) {
@@ -573,14 +718,20 @@ async function installCodexUltraRuntime(options) {
       for (const query of queries) {
         if (visited.has(query) || JSON.stringify(query.queryKey) !== JSON.stringify(record.queryKey)) continue;
         visited.add(query);
+        trackPublisher(query, client, record);
         const original = query.state?.data;
-        const patched = codexUltraModelResponse(original, declarations);
-        if (patched === original) continue;
-        const before = cacheChanges.get(query);
+        const patched = normalizeResponse(original);
         const updatedAt = query.state?.dataUpdatedAt;
+        if (patched === original) {
+          const source = responseSources.get(original);
+          if (source) cacheChanges.set(query, { client, key: query.queryKey,
+            original: source, patched: original, updatedAt });
+          continue;
+        }
+        const before = cacheChanges.get(query);
         const published = client.setQueryData(query.queryKey, patched, { updatedAt });
         cacheChanges.set(query, { client, key: query.queryKey,
-          original: before?.patched === original ? before.original : original,
+          original: responseSources.get(original) || (before?.patched === original ? before.original : original),
           patched: published ?? query.state?.data, updatedAt });
       }
     }
@@ -598,14 +749,18 @@ async function installCodexUltraRuntime(options) {
         }
       }
     }
-    changes.clear(); records.clear(); restoreCache();
+    restorePublishers(); restoreCache(); changes.clear(); records.clear();
   };
   const refreshOnce = async () => {
     if (disposed || !enabled) return;
     const currentGeneration = generation;
     try {
       const legacyUrl = codexAppAssetUrl('app-initial-');
-      const url = legacyUrl || codexUltraWebpackEntryUrl();
+      const entries = legacyUrl ? '' : JSON.stringify(codexUltraWebpackEntryUrls());
+      const url = legacyUrl || (assetUrl && contract && createQuery && entries === entrySignature && codexUltraWebpackEntryLoaded(assetUrl)
+        ? assetUrl : await codexUltraWebpackEntryUrl(options));
+      if (disposed || !enabled || generation !== currentGeneration) return;
+      if (!legacyUrl && entries !== JSON.stringify(codexUltraWebpackEntryUrls())) throw new Error('Codex Ultra document entries changed');
       if (!url) { reason = 'awaiting-page'; restoreAll(); return; }
       if (url !== assetUrl || !contract || !createQuery) {
         restoreAll(); contract = null; createQuery = null;
@@ -623,10 +778,20 @@ async function installCodexUltraRuntime(options) {
         if (!legacyUrl && codexAppAssetUrl(webpackEntry) !== url) {
           throw new Error('Ambiguous Codex Ultra entry resource');
         }
+        const loadEntry = () => {
+          if (disposed || !enabled || generation !== currentGeneration) throw new Error('Codex Ultra entry loading cancelled');
+          if (entries !== JSON.stringify(codexUltraWebpackEntryUrls()) || !codexUltraWebpackEntryLoaded(url)) {
+            throw new Error('Codex Ultra loaded entry evidence changed');
+          }
+          return loadCodexAppModule(webpackEntry, { expectedUrl: url,
+            validate: address => !disposed && enabled && generation === currentGeneration && address === url
+              && entries === JSON.stringify(codexUltraWebpackEntryUrls()) && codexUltraWebpackEntryLoaded(url),
+          });
+        };
         try {
           [source, shared, module] = await Promise.race([
             legacyUrl ? Promise.all([read(url), read(sharedUrl), loadCodexAppModule('app-shared-')])
-              : Promise.resolve(loadCodexAppModule(webpackEntry)).then(module => [null, null, module]),
+              : Promise.resolve().then(loadEntry).then(module => [null, null, module]),
             new Promise((_, reject) => {
               timeout = setTimeout(() => {
                 const failure = new Error('Codex Ultra asset loading timed out');
@@ -645,7 +810,7 @@ async function installCodexUltraRuntime(options) {
           const discovered = discoverCodexUltraWebpackRuntime(module, allowResponseFallback);
           contract = discovered.contract; createQuery = discovered.createQuery;
         }
-        assetUrl = url;
+        assetUrl = url; entrySignature = entries;
       }
       reason = 'awaiting-model-query'; error = '';
       const visited = new Set();

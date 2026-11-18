@@ -14,7 +14,15 @@ const OWNER_EVIDENCE = 'scripts/public-source-docs/owner-release-decision-1.7.1.
 const OWNER_EVIDENCE_SHA256 = 'a95d09b14f963a65fe2a07e6cd3929a85c83a10185fc7afda4538f2b94f05704'
 const OWNER_DECISION_ID = 'gaoge-1.7.1-2026-11-12'
 const OWNER_VERSION = '1.7.1'
-const BUFFERED_FILES = new Set([...METADATA, RIGHTS_AUDIT, OWNER_EVIDENCE, 'package.json'])
+const OWNER_RELEASE_RECORDS = new Map([
+  [OWNER_VERSION, { version: OWNER_VERSION, decisionId: OWNER_DECISION_ID, evidencePath: OWNER_EVIDENCE,
+    evidenceSha256: OWNER_EVIDENCE_SHA256, disclosureField: 'acknowledgesUnverifiedRights' }],
+  ['1.7.2', { version: '1.7.2', decisionId: 'gaoge-1.7.2-2026-11-18',
+    evidencePath: 'scripts/public-source-docs/owner-release-decision-1.7.2.md',
+    evidenceSha256: '2f306647796e027dc745d8fbbf1f1ebeea11085a4b4259ec90f40b78b089ed25', disclosureField: 'retainsUnverifiedDisclosures' }],
+])
+const BUFFERED_FILES = new Set([...METADATA, RIGHTS_AUDIT,
+  ...[...OWNER_RELEASE_RECORDS.values()].map(record => record.evidencePath), 'package.json'])
 const UNVERIFIED_STATUSES = new Set([
   'unverified-language-pack', 'unverified-embedded-proprietary-native-query',
   'unverified-proprietary-native-code', 'unverified-customer-logo-permission',
@@ -100,21 +108,24 @@ function validateRightsDisclosures(files, report, version, label) {
     }
   }
   const hasDecision = audit.items.some((item) => Object.hasOwn(item, 'releaseDecision'))
-  const active = disclosures.length > 0 || hasDecision || (files.has(OWNER_EVIDENCE) && hasRightsAssets)
+  const active = disclosures.length > 0 || hasDecision || ([...OWNER_RELEASE_RECORDS.values()].some(record => files.has(record.evidencePath)) && hasRightsAssets)
   if (!active) {
     for (const name of files.keys()) requireThat(!RIGHTS_PATH.test(name) || auditEntries.has(name), `${label}: missing path-bound rights audit: ${name}`)
     return
   }
-  requireThat(version === OWNER_VERSION, `${label}: owner publication decision does not apply to release version`)
-  const evidenceFile = files.get(OWNER_EVIDENCE)
-  requireThat(evidenceFile?.bytes && evidenceFile.sha256 === OWNER_EVIDENCE_SHA256
-    && createHash('sha256').update(evidenceFile.bytes).digest('hex') === OWNER_EVIDENCE_SHA256, `${label}: owner publication evidence hash mismatch or missing evidence`)
+  const record = OWNER_RELEASE_RECORDS.get(version)
+  requireThat(record, `${label}: owner publication decision does not apply to release version`)
+  requireThat(audit.items.filter(item => Object.hasOwn(item, 'releaseDecision')).every(item => item.releaseDecision?.version === version),
+    `${label}: invalid or unbound owner publication decision does not apply to release version`)
+  const evidenceFile = files.get(record.evidencePath)
+  requireThat(evidenceFile?.bytes && evidenceFile.sha256 === record.evidenceSha256
+    && createHash('sha256').update(evidenceFile.bytes).digest('hex') === record.evidenceSha256, `${label}: owner publication evidence hash mismatch or missing evidence`)
   const blocks = [...evidenceFile.bytes.toString('utf8').matchAll(/```json\s*\r?\n([\s\S]*?)\r?\n```/gu)]
   requireThat(blocks.length === 1, `${label}: invalid owner publication scope block`)
   let scope
   try { scope = JSON.parse(blocks[0][1]) } catch { throw new Error(`${label}: invalid owner publication scope JSON`) }
   exactKeys(scope, ['decisionId', 'version', 'items'], `${label}: owner publication scope`)
-  requireThat(scope.decisionId === OWNER_DECISION_ID && scope.version === OWNER_VERSION
+  requireThat(scope.decisionId === record.decisionId && scope.version === record.version
     && Array.isArray(scope.items) && scope.items.length === 50, `${label}: invalid owner publication scope identity`)
   const scoped = new Map(), scopeKeys = new Set()
   for (const item of scope.items) {
@@ -142,13 +153,13 @@ function validateRightsDisclosures(files, report, version, label) {
     requireThat(disclosure.status === scopedItem.status && disclosure.reason === scopedItem.reason
       && disclosure.sha256 === scopedItem.sha256, `${label}: rights disclosure must preserve original unverified status, reason and hash: ${name}`)
     const decision = disclosure.releaseDecision
-    exactKeys(decision, ['type', 'decisionId', 'version', 'sha256', 'evidence', 'acknowledgesUnverifiedRights'], `${label}: releaseDecision`)
-    requireThat(decision.type === 'owner-directed-publication' && decision.decisionId === OWNER_DECISION_ID
-      && decision.version === OWNER_VERSION && decision.sha256 === scopedItem.sha256
-      && decision.acknowledgesUnverifiedRights === true, `${label}: invalid or unbound owner publication decision: ${name}`)
+    exactKeys(decision, ['type', 'decisionId', 'version', 'sha256', 'evidence', record.disclosureField], `${label}: releaseDecision`)
+    requireThat(decision.type === 'owner-directed-publication' && decision.decisionId === record.decisionId
+      && decision.version === record.version && decision.sha256 === scopedItem.sha256
+      && decision[record.disclosureField] === true, `${label}: invalid or unbound owner publication decision: ${name}`)
     requireThat(Array.isArray(decision.evidence) && decision.evidence.length === 1, `${label}: missing or extra owner publication evidence: ${name}`)
     exactKeys(decision.evidence[0], ['path', 'sha256'], `${label}: publication evidence`)
-    requireThat(decision.evidence[0].path === OWNER_EVIDENCE && decision.evidence[0].sha256 === OWNER_EVIDENCE_SHA256,
+    requireThat(decision.evidence[0].path === record.evidencePath && decision.evidence[0].sha256 === record.evidenceSha256,
       `${label}: owner publication evidence hash or path mismatch: ${name}`)
     requireThat(isDeepStrictEqual(audited.releaseDecision, decision), `${label}: audit and disclosure publication decisions differ: ${name}`)
   }

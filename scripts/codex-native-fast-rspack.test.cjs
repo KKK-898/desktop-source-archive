@@ -1,5 +1,6 @@
 // Adapted from BigPizzaV3/CodexPlusPlus ce1767a1a24ac9dc6b9c0f95bed1648d944c89e1.
-// See src-tauri/src/third_party/codex-plus-plus/NOTICE and LICENSE.
+// Includes the issue #3103 regression from upstream e5567301196fbfadd9184d77aea4b4980c5f1f77.
+// See src-tauri/src/third_party/codex-plus-plus/NOTICE.md and LICENSE.
 const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const path = require("node:path");
@@ -258,4 +259,25 @@ test("Rspack document preparation discovers numbered entries and preserves the i
   }
   api.runtime.update({ enhancementsEnabled: false, codexAppNativeFastUnlock: true });
   assert.equal((await api.prepareDocumentModules(options)).diagnostics.reason, "disabled");
+});
+
+
+test("Rspack document preparation finds the runtime after four leading entry scripts (issue #3103)", async () => {
+  const window = context();
+  vm.runInNewContext(fs.readFileSync(path.join(__dirname, "../src-tauri/src/third_party/codex-plus-plus/native-fast-rspack.js"), "utf8"), { window, Error, URL });
+  const api = window.__codexPlusNativeFastUnlock;
+  // 26.1111 起 index.html 有 5 个入口，runtime 排在最后；前面的都是普通分块。
+  const runtimeUrl = "app://-/assets/348410.abcdef.js";
+  const leading = ["903838.a1", "203305.b2", "727403.c3", "936243.d4"].map(name => `app://-/assets/${name}.js`);
+  const fetched = [];
+  const result = await api.prepareDocumentModules({
+    location: new URL("app://-/index.html"),
+    document: { scripts: [...leading, runtimeUrl].map(src => ({ src })) },
+    fetchText: async value => { fetched.push(value); return value === runtimeUrl ? reorderedRuntimeSource : chunkSource; },
+    readRspackFactories: async () => inlineFixtures(),
+  });
+  assert.equal(result.ok, true, JSON.stringify(result.diagnostics));
+  assert.ok(fetched.includes(runtimeUrl));
+  assert.equal(result.modules[0].url, "app://-/assets/782259.abcdef.js");
+  assert.deepEqual(Object.values(result.diagnostics.matches), [1, 1, 1, 1]);
 });

@@ -4,7 +4,7 @@ const vm=require('node:vm')
 const path=require('node:path')
 const test=require('node:test')
 const {installedAsar}=require('./verify-codex-ultra-installed.cjs')
-const {nativeWebpackApiFixture}=require('./codex-api-mode-webpack-native-fixture.cjs')
+const {nativeWebpackApiFixture,reviewBrowserAuthImports}=require('./codex-api-mode-webpack-native-fixture.cjs')
 const packagePath=process.env.CODEX_API_MODE_ASAR||process.env.CODEX_NATIVE_APP_ASAR||installedAsar()
 const isWebpack=!require('@electron/asar').listPackage(packagePath).some(name=>/app-initial-[^\\/]+\.js$/.test(name))
 const fixture=isWebpack?nativeWebpackApiFixture(packagePath):null
@@ -16,6 +16,28 @@ const createGuard=vm.runInThisContext(runtimeSource+'\ncreateCodexApiModeGuard;'
 const api={accountId:null,userId:null,authMethod:'apikey',stableId:'synthetic-device'}
 const account={accountId:'synthetic-account',userId:'synthetic-user',authMethod:'chatgpt',stableId:'synthetic-device'}
 function harness(t,options){const h=fixture.createHarness(options);const bindings=discover(h);assert.equal(bindings.error,null);let state={apiCodingModeEnabled:true};const guard=createGuard(bindings,{getState:()=>state,eventTarget:null});t?.after(()=>guard.dispose());return Object.assign(h,{bindings,guard,setState:value=>{state=value}})}
+
+test('desktop fixture isolates only unused browser auth imports in the two reviewed factories', () => {
+  const ts = require('typescript')
+  const factory = (name, body) => {
+    const tree = ts.createSourceFile('synthetic.js', `const modules={${name}(e,t,n){${body}}}`,
+      ts.ScriptTarget.Latest, true, ts.ScriptKind.JS)
+    return {tree, node:tree.statements[0].declarationList.declarations[0].initializer.properties[0]}
+  }
+  const auth = factory('CWeU', 'n("Au4v");')
+  const product = factory('T8X0', 'n("Au4v"),n("other");')
+  assert.equal(reviewBrowserAuthImports([factory('CWeU','n("other");')]), false) // older desktop host
+  // The installed-package tests below exercise a matching factory. A new,
+  // missing, or ambiguous initializer must not be treated as a no-op.
+  for (const sources of [[], ['changed factory'], ['first', 'second']]) {
+    assert.throws(() => reviewBrowserAuthImports([auth, product], () => sources), /browser auth (?:factory|initialization)/)
+  }
+  assert.throws(() => reviewBrowserAuthImports([auth]), /Unreviewed browser auth import sites/)
+  assert.throws(() => reviewBrowserAuthImports([auth, product, factory('other','n("Au4v");')]), /Unreviewed browser auth import sites/)
+  for (const usage of ['n("Au4v").read();', 'const value=n("Au4v");', 'return n("Au4v");', 'if (ready) n("Au4v");', 'function later(){n("Au4v");}']) {
+    assert.throws(() => reviewBrowserAuthImports([factory('CWeU', usage), product]), /Browser auth import must be unused/)
+  }
+})
 
 webpackTest('installed webpack native settings use API Coding policy without granting account access',async t=>{
   const h=harness(t),beforeAuth=h.scope.get(h.descriptors.realAuth),beforeInput=h.scope.get(h.descriptors.input)
